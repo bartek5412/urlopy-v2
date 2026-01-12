@@ -86,8 +86,8 @@ docker-compose build
 ### 4.2. Uruchom migracje bazy danych
 
 ```bash
-# Uruchom kontener tymczasowo do wykonania migracji
-docker-compose run --rm urlopy-app npx prisma migrate deploy
+# Uruchom kontener tymczasowo do wykonania migracji (użyj npm run zamiast npx)
+docker-compose -f docker-compose.prod.yml run --rm urlopy-app npm run prisma:migrate
 ```
 
 ### 4.3. Uruchom aplikację
@@ -171,7 +171,7 @@ docker-compose down
 docker-compose up -d
 
 # Uruchom migracje (jeśli są nowe)
-docker-compose run --rm urlopy-app npx prisma migrate deploy
+docker-compose -f docker-compose.prod.yml run --rm urlopy-app npm run prisma:migrate
 ```
 
 ### Backup bazy danych

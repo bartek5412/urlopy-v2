@@ -47,7 +47,7 @@ mkdir -p prisma
 docker-compose -f docker-compose.prod.yml build
 
 # Uruchom migracje
-docker-compose -f docker-compose.prod.yml run --rm urlopy-app npx prisma migrate deploy
+docker-compose -f docker-compose.prod.yml run --rm urlopy-app npm run prisma:migrate
 
 # Uruchom aplikację
 docker-compose -f docker-compose.prod.yml up -d
@@ -80,7 +80,7 @@ docker-compose -f docker-compose.prod.yml logs -f urlopy-app
 git pull
 docker-compose -f docker-compose.prod.yml build
 docker-compose -f docker-compose.prod.yml up -d
-docker-compose -f docker-compose.prod.yml run --rm urlopy-app npx prisma migrate deploy
+docker-compose -f docker-compose.prod.yml run --rm urlopy-app npm run prisma:migrate
 ```
 
 ## Ważne!
