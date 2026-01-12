@@ -1,45 +1,21 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import prisma from "@/lib/db";
 
 export async function middleware(request: NextRequest) {
   const user_id = request.cookies.get("user_id");
 
   // Ochrona routes wymagających logowania
+  // Middleware działa w Edge Runtime i nie może używać Prisma Client
+  // Weryfikacja użytkownika w bazie jest wykonywana w API routes i layoutach
   if (request.nextUrl.pathname.startsWith("/leave-request")) {
     if (!user_id) {
       return NextResponse.redirect(new URL("/", request.url));
     }
-
-    // Weryfikuj czy użytkownik faktycznie istnieje w bazie
-    try {
-      const userId = parseInt(user_id.value);
-      if (isNaN(userId)) {
-        // Nieprawidłowe ID - usuń cookie i przekieruj
-        const response = NextResponse.redirect(new URL("/", request.url));
-        response.cookies.delete("user_id");
-        return response;
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true }, // Tylko sprawdź czy istnieje, nie pobieraj wszystkich danych
-      });
-
-      if (!user) {
-        // Użytkownik nie istnieje - usuń cookie i przekieruj
-        const response = NextResponse.redirect(new URL("/", request.url));
-        response.cookies.delete("user_id");
-        return response;
-      }
-    } catch (error) {
-      // W przypadku błędu, usuń cookie i przekieruj
-      console.error("Error verifying user in middleware:", error);
-      // W development, pozwól przejść dalej jeśli błąd jest związany z bazą danych
-      if (process.env.NODE_ENV === "development") {
-        console.warn("Middleware database error in development, allowing request");
-        return NextResponse.next();
-      }
+    
+    // Podstawowa walidacja formatu cookie (tylko sprawdza czy jest liczbą)
+    const userId = parseInt(user_id.value);
+    if (isNaN(userId)) {
+      // Nieprawidłowe ID - usuń cookie i przekieruj
       const response = NextResponse.redirect(new URL("/", request.url));
       response.cookies.delete("user_id");
       return response;
@@ -47,27 +23,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Przekieruj zalogowanych użytkowników ze strony logowania
+  // (sprawdzamy tylko obecność cookie, weryfikacja w bazie jest w layoutach)
   if (request.nextUrl.pathname === "/" && user_id) {
-    // Sprawdź czy użytkownik istnieje przed przekierowaniem
-    try {
-      const userId = parseInt(user_id.value);
-      if (!isNaN(userId)) {
-        const user = await prisma.user.findUnique({
-          where: { id: userId },
-          select: { id: true },
-        });
-        if (user) {
-          return NextResponse.redirect(new URL("/leave-request", request.url));
-        } else {
-          // Użytkownik nie istnieje - usuń cookie
-          const response = NextResponse.next();
-          response.cookies.delete("user_id");
-          return response;
-        }
-      }
-    } catch (error) {
-      // W przypadku błędu, kontynuuj normalnie
-      console.error("Error checking user in middleware:", error);
+    const userId = parseInt(user_id.value);
+    if (!isNaN(userId)) {
+      // Przekieruj do /leave-request - jeśli użytkownik nie istnieje,
+      // weryfikacja w layoutzie/API route przekieruje z powrotem
+      return NextResponse.redirect(new URL("/leave-request", request.url));
     }
   }
 
