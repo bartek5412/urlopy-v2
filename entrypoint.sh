@@ -1,10 +1,10 @@
 #!/bin/sh
 set -e
 
-# Uruchom migracje jeśli są (użyj npm run z package.json)
+# Uruchom migracje jeśli są
 if [ -f "package.json" ] && [ -d "node_modules/prisma" ]; then
   echo "Running Prisma migrations..."
-  node node_modules/prisma/build/index.js migrate deploy || true
+  npm run prisma:migrate || true
 fi
 
 # Uruchom aplikację

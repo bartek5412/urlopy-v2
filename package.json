@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "node node_modules/prisma/build/index.js migrate deploy",
+    "prisma:migrate": "prisma migrate deploy",
     "prisma:studio": "prisma studio"
   },
   "dependencies": {

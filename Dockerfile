@@ -57,13 +57,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
 
 # Skopiuj node_modules potrzebne dla Prisma CLI i aplikacji
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
-
-# Skopiuj .bin directory dla Prisma CLI
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+# Prisma CLI wymaga wielu zależności (effect, spdx-*, itp.), więc kopiujemy wszystkie node_modules
+# To zwiększa rozmiar obrazu, ale zapewnia, że migracje będą działać
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Skopiuj package.json dla npm scripts
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
