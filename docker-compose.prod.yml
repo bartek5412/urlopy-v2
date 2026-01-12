@@ -12,11 +12,8 @@ services:
       - DATABASE_URL=file:./prisma/prod.db
       - PATH=/app/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
-      # Persystentna baza danych SQLite
-      - ./prisma/prod.db:/app/prisma/prod.db
-      - ./prisma/prod.db-journal:/app/prisma/prod.db-journal
-      - ./prisma/prod.db-wal:/app/prisma/prod.db-wal
-      - ./prisma/prod.db-shm:/app/prisma/prod.db-shm
+      # Persystentna baza danych SQLite - montuj cały katalog prisma
+      - ./prisma:/app/prisma
     networks:
       - urlopy-network
     healthcheck:
