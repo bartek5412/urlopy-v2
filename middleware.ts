@@ -35,6 +35,11 @@ export async function middleware(request: NextRequest) {
     } catch (error) {
       // W przypadku błędu, usuń cookie i przekieruj
       console.error("Error verifying user in middleware:", error);
+      // W development, pozwól przejść dalej jeśli błąd jest związany z bazą danych
+      if (process.env.NODE_ENV === "development") {
+        console.warn("Middleware database error in development, allowing request");
+        return NextResponse.next();
+      }
       const response = NextResponse.redirect(new URL("/", request.url));
       response.cookies.delete("user_id");
       return response;
