@@ -10,6 +10,7 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:./prisma/prod.db
+      - PATH=/app/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     volumes:
       # Persystentna baza danych SQLite
       - ./prisma/prod.db:/app/prisma/prod.db
