@@ -42,11 +42,14 @@ export async function POST(request: NextRequest) {
     const result = await loginUser(email, password);
 
     if (!result.user) {
+      console.error("Login failed:", { email, error: result.error });
       return NextResponse.json(
         { error: result.error || "Nieprawidłowy email lub hasło" },
         { status: 401 }
       );
     }
+
+    console.log("Login successful:", { userId: result.user.id, email: result.user.email });
 
     // Ustaw cookie z ID użytkownika
     const cookieStore = await cookies();

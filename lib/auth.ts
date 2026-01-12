@@ -96,17 +96,23 @@ export async function loginUser(
 
     const sanitizedEmail = email.toLowerCase().trim();
 
+    console.log("Attempting login for email:", sanitizedEmail);
+
     const user = await prisma.user.findUnique({
       where: { email: sanitizedEmail },
     });
 
     if (!user) {
+      console.log("User not found in database:", sanitizedEmail);
       // Nie ujawniaj, czy użytkownik istnieje (security best practice)
       return { user: null, error: "Nieprawidłowy email lub hasło" };
     }
 
+    console.log("User found:", { id: user.id, email: user.email });
+
     // Porównaj zahashowane hasła
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log("Password valid:", isPasswordValid);
 
     if (!isPasswordValid) {
       return { user: null, error: "Nieprawidłowy email lub hasło" };
