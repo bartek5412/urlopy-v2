@@ -57,8 +57,12 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ user: result.user }, { status: 201 });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error registering:", error);
-    return NextResponse.json({ error: "Failed to register" }, { status: 500 });
+    // Zwróć bardziej szczegółowy błąd w development
+    const errorMessage = process.env.NODE_ENV === "development" 
+      ? error?.message || "Failed to register"
+      : "Failed to register";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

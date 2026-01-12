@@ -3,6 +3,7 @@
 ## Problem z SQLite
 
 SQLite **nie działa** na Vercel, ponieważ:
+
 - Vercel używa serverless functions z read-only filesystem
 - SQLite wymaga zapisu do pliku na dysku
 - Każda funkcja serverless ma własny, tymczasowy filesystem
@@ -14,6 +15,7 @@ Musisz zmienić bazę danych na PostgreSQL. Masz kilka opcji:
 ### Opcja 1: Vercel Postgres (Zalecane)
 
 1. **W Vercel Dashboard:**
+
    - Przejdź do swojego projektu
    - **Storage** → **Create Database** → **Postgres**
    - Utwórz bazę danych
@@ -28,6 +30,7 @@ Musisz zmienić bazę danych na PostgreSQL. Masz kilka opcji:
 ### Opcja 2: Zewnętrzna baza danych
 
 Możesz użyć:
+
 - **Supabase** (darmowy tier)
 - **Neon** (darmowy tier)
 - **PlanetScale** (darmowy tier)
@@ -47,6 +50,7 @@ datasource db {
 ### 2. Zaktualizuj `package.json`:
 
 Usuń `better-sqlite3` (nie jest potrzebny dla PostgreSQL):
+
 ```json
 // Usuń tę linię:
 "better-sqlite3": "^12.6.0",
@@ -75,10 +79,12 @@ git push
 ## Konfiguracja na Vercel
 
 1. **Environment Variables:**
+
    - W Vercel Dashboard → **Settings** → **Environment Variables**
    - Dodaj `DATABASE_URL` z connection string PostgreSQL
 
 2. **Build Command:**
+
    - Vercel automatycznie wykryje Next.js
    - Upewnij się, że `package.json` ma:
      ```json
@@ -93,6 +99,7 @@ git push
 Jeśli masz dane w SQLite, które chcesz przenieść:
 
 1. **Eksportuj dane z SQLite:**
+
    ```bash
    npx prisma db pull
    ```
@@ -107,7 +114,8 @@ Jeśli masz dane w SQLite, które chcesz przenieść:
 
 **Przyczyna:** SQLite nie działa na Vercel
 
-**Rozwiązanie:** 
+**Rozwiązanie:**
+
 1. Zmień na PostgreSQL (jak wyżej)
 2. Upewnij się, że `DATABASE_URL` jest ustawiony w Vercel
 3. Uruchom migracje: `npx prisma migrate deploy`
@@ -115,6 +123,7 @@ Jeśli masz dane w SQLite, które chcesz przenieść:
 ### Błąd: "Prisma Client not generated"
 
 **Rozwiązanie:**
+
 - Dodaj `prisma generate` do build command
 - Lub użyj `postinstall` script w `package.json`:
   ```json
@@ -124,6 +133,7 @@ Jeśli masz dane w SQLite, które chcesz przenieść:
 ### Błąd: "Connection timeout"
 
 **Rozwiązanie:**
+
 - Sprawdź, czy connection string jest poprawny
 - Upewnij się, że baza danych pozwala na połączenia z Vercel IP
 - Dla Vercel Postgres to działa automatycznie
@@ -131,6 +141,7 @@ Jeśli masz dane w SQLite, które chcesz przenieść:
 ## Alternatywa: Pozostań przy VPS
 
 Jeśli chcesz pozostać przy SQLite, lepiej użyć VPS (jak wcześniej przygotowaliśmy):
+
 - Docker + SQLite działa dobrze
 - Pełna kontrola nad środowiskiem
 - Tańsze dla większych aplikacji
