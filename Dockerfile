@@ -48,9 +48,13 @@ COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 # Skopiuj Prisma schema, config i wygenerowany client
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma.config.ts ./prisma.config.ts
+
+# Skopiuj potrzebne node_modules (standalone może nie zawierać wszystkich)
+# Prisma Client
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
-# Skopiuj adapter better-sqlite3
+# Adapter better-sqlite3
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/adapter-better-sqlite3 ./node_modules/@prisma/adapter-better-sqlite3
+# better-sqlite3
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/better-sqlite3 ./node_modules/better-sqlite3
 
 USER nextjs
