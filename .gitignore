@@ -39,3 +39,13 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database (dev only)
+/data/*.db
+/data/*.db-journal
+dev.db
+dev.db-journal
+dev.db-wal
+dev.db-shm
+# Production database files should be on server, not in git
+# But we don't ignore all *.db to allow prod.db structure

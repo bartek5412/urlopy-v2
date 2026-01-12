@@ -2,7 +2,6 @@
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
@@ -23,10 +22,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export default function HomePage() {
+export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isErrorDialogOpen, setIsErrorDialogOpen] = useState(false);
@@ -37,45 +37,55 @@ export default function HomePage() {
     setErrorMessage(null);
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, name }),
       });
 
       if (response.ok) {
         router.push("/leave-request");
       } else {
         const error = await response.json();
-        setErrorMessage(error.error || "Błąd logowania");
+        setErrorMessage(error.error || "Błąd rejestracji");
         setIsErrorDialogOpen(true);
       }
     } catch (error) {
-      setErrorMessage("Wystąpił błąd podczas logowania");
+      setErrorMessage("Wystąpił błąd podczas rejestracji");
       setIsErrorDialogOpen(true);
     } finally {
       setIsLoading(false);
     }
   };
+
   return (
     <div className="flex justify-center items-center h-screen">
       <div className="absolute inset-0 z-0">
         <img
           src="/header.jpg"
           alt="Background"
-          className="w-full h-full object-cover "
+          className="w-full h-full object-cover"
         />
       </div>
       <Card className="relative z-10 w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Zaloguj się aby kontynuować</CardTitle>
-          <CardDescription>
-            Wpisz swój adres email aby się zalogować
-          </CardDescription>
+          <CardTitle>Zarejestruj się</CardTitle>
+          <CardDescription>Utwórz nowe konto, aby kontynuować</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent>
             <div className="flex flex-col gap-6">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Imię i nazwisko</Label>
+                <Input
+                  required
+                  id="name"
+                  type="text"
+                  placeholder="Wprowadź imię i nazwisko"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -88,15 +98,7 @@ export default function HomePage() {
                 />
               </div>
               <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Hasło</Label>
-                  <a
-                    href="#"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Zapomniałeś hasła?
-                  </a>
-                </div>
+                <Label htmlFor="password">Hasło</Label>
                 <Input
                   id="password"
                   placeholder="Wprowadź hasło"
@@ -110,15 +112,15 @@ export default function HomePage() {
           </CardContent>
           <CardFooter className="flex-col gap-2">
             <Button type="submit" className="w-full mt-4" disabled={isLoading}>
-              {isLoading ? "Logowanie..." : "Zaloguj się"}
+              {isLoading ? "Rejestrowanie..." : "Zarejestruj się"}
             </Button>
             <Button
               type="button"
               variant="outline"
               className="w-full"
-              onClick={() => router.push("/register")}
+              onClick={() => router.push("/")}
             >
-              Zarejestruj się
+              Masz już konto? Zaloguj się
             </Button>
           </CardFooter>
         </form>
@@ -127,7 +129,7 @@ export default function HomePage() {
       <AlertDialog open={isErrorDialogOpen} onOpenChange={setIsErrorDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Błąd logowania</AlertDialogTitle>
+            <AlertDialogTitle>Błąd rejestracji</AlertDialogTitle>
             <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

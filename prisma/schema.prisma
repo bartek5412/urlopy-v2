@@ -1,0 +1,37 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  password      String
+  name          String?
+  role          String    @default("employee") // "employee" lub "leader"
+  leaderId      Int?      @map("leader_id") // ID lidera przypisanego do pracownika
+  daysAvailable Int       @default(26) // Dostępne dni urlopu
+  daysPerYear   Int       @default(26) // Ile dni dodaje się po przekroczeniu roku
+  createdAt     String    @default("CURRENT_TIMESTAMP") @map("created_at")
+
+  @@map("users")
+}
+
+model LeaveRequest {
+  id            Int       @id @default(autoincrement())
+  employeeEmail String    @map("employee_email")
+  startDate     String    @map("start_date")
+  endDate       String    @map("end_date")
+  description   String?
+  status        String    @default("pending")
+  createdAt     String    @default("CURRENT_TIMESTAMP") @map("created_at")
+
+  @@map("leave_requests")
+}
