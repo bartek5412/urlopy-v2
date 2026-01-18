@@ -3,8 +3,8 @@ name: Deploy to VPS
 on:
   push:
     branches:
-      - master  # lub 'master' w zależności od Twojej gałęzi
-  workflow_dispatch:  # Pozwala na ręczne uruchomienie
+      - master
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -14,30 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build Docker image
-        run: |
-          docker build -t urlopy-v2:${{ github.sha }} .
-          docker save urlopy-v2:${{ github.sha }} | gzip > urlopy-app.tar.gz
-
       - name: Deploy to VPS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE || '' }}
-          timeout: 60s
-          source: "urlopy-app.tar.gz,docker-compose.prod.yml,prisma/"
-          target: "/opt/urlopy-v2"
-          strip_components: 0
-
-      - name: Execute deployment on VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -46,24 +23,55 @@ jobs:
           port: ${{ secrets.VPS_PORT || 22 }}
           passphrase: ${{ secrets.VPS_SSH_PASSPHRASE || '' }}
           timeout: 60s
-          command_timeout: 300s
+          command_timeout: 900s
           script: |
             cd /opt/urlopy-v2
-            
-            # Zaimportuj nowy obraz Docker
-            gunzip -c urlopy-app.tar.gz | docker load
             
             # Zatrzymaj stary kontener
             docker-compose -f docker-compose.prod.yml down || true
             
-            # Usuń stary obraz (opcjonalnie - zwalnia miejsce)
-            docker image prune -f
+            # Pobierz najnowszy kod z repozytorium (jeśli repo jest na VPS)
+            if [ -d ".git" ]; then
+              git pull origin master || true
+            fi
+
+      - name: Copy files to VPS using tar pipe
+        run: |
+          # Przygotuj klucz SSH
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          
+          # Skopiuj docker-compose.prod.yml
+          cat docker-compose.prod.yml | ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cat > /opt/urlopy-v2/docker-compose.prod.yml"
+          
+          # Skopiuj folder prisma przez tar pipe
+          tar czf - prisma/ | ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cd /opt/urlopy-v2 && tar xzf -"
+          
+          # Usuń klucz tymczasowy
+          rm -f ~/.ssh/deploy_key
+
+      - name: Build and start containers on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE || '' }}
+          timeout: 60s
+          command_timeout: 900s
+          script: |
+            cd /opt/urlopy-v2
+            
+            # Zbuduj obraz Docker na VPS
+            docker-compose -f docker-compose.prod.yml build
             
             # Uruchom nowy kontener
             docker-compose -f docker-compose.prod.yml up -d
             
-            # Wyczyść zaimportowany plik tar
-            rm -f urlopy-app.tar.gz
+            # Wyczyść stare obrazy (opcjonalnie)
+            docker image prune -f || true
             
             # Sprawdź status
             docker-compose -f docker-compose.prod.yml ps
