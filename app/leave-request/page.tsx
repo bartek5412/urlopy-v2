@@ -39,6 +39,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter } from "next/navigation";
 import { pl } from "date-fns/locale";
+import { isPolishHoliday, getPolishHolidays } from "@/lib/polish-holidays";
 
 interface User {
   id: number;
@@ -53,10 +54,7 @@ export default function LeaveRequestPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: new Date(),
-    to: addDays(new Date(), 2),
-  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [type, setType] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{
@@ -169,12 +167,11 @@ export default function LeaveRequestPage() {
                 const requests = await response.json();
                 const newCount = requests.length;
 
-                console.log(`Login check: newCount=${newCount}`);
 
                 // Przy logowaniu zawsze pokazuj powiadomienie jeśli są wnioski
                 if (newCount > 0) {
-                  console.log(`✅ Login: Showing notification for ${newCount} pending requests`);
-                  
+
+
                   setToasts((prev) => {
                     const filtered = prev.filter(
                       (t) =>
@@ -189,17 +186,15 @@ export default function LeaveRequestPage() {
                       } do zaakceptowania`,
                       type: "info" as const,
                     };
-                    console.log("Login: Adding toast:", newToast);
                     return [...filtered, newToast];
                   });
-                  
+
                   // Zaktualizuj localStorage PO pokazaniu powiadomienia
                   localStorage.setItem(
                     "notifiedPendingCount",
                     newCount.toString()
                   );
                 } else {
-                  console.log(`Login: No pending requests`);
                   // Jeśli nie ma wniosków, zresetuj localStorage
                   localStorage.setItem("notifiedPendingCount", "0");
                 }
@@ -230,17 +225,41 @@ export default function LeaveRequestPage() {
         );
         if (response.ok) {
           const data = await response.json();
-          // Oblicz wykorzystane dni tylko z zaakceptowanych wniosków
+          // Oblicz wykorzystane dni tylko z zaakceptowanych wniosków (bez weekendów i świąt)
           const approvedRequests = data.filter(
             (req: any) => req.status === "approved"
           );
           let totalDays = 0;
           approvedRequests.forEach((req: any) => {
-            const start = new Date(req.start_date);
-            const end = new Date(req.end_date);
-            const diffTime = Math.abs(end.getTime() - start.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            totalDays += diffDays + 1; // +1 bo wliczamy oba dni
+            // Parsuj daty w formacie YYYY-MM-DD w lokalnej strefie czasowej
+            const parseDate = (dateStr: string): Date => {
+              const [year, month, day] = dateStr.split('-').map(Number);
+              return new Date(year, month - 1, day, 0, 0, 0, 0);
+            };
+            
+            const start = parseDate(req.start_date);
+            const end = parseDate(req.end_date);
+            
+            // Funkcja sprawdzająca czy dzień to weekend (sobota=6, niedziela=0)
+            const isWeekend = (date: Date) => {
+              const day = date.getDay();
+              return day === 0 || day === 6;
+            };
+            
+            let daysCount = 0;
+            const currentDate = new Date(start);
+            
+            // Iteruj przez wszystkie dni w zakresie (włącznie z dniem końcowym)
+            while (currentDate <= end) {
+              // Zliczaj tylko dni robocze (bez weekendów i świąt)
+              if (!isWeekend(currentDate) && !isPolishHoliday(currentDate)) {
+                daysCount++;
+              }
+              // Przejdź do następnego dnia
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+            
+            totalDays += daysCount;
           });
           setUsedDays(totalDays);
         }
@@ -254,7 +273,7 @@ export default function LeaveRequestPage() {
   // Funkcja do pobierania liczby wniosków do zaakceptowania
   const fetchPendingCount = useCallback(async () => {
     if (!isLeader) return;
-    
+
     try {
       const response = await fetch("/api/leave-requests?status=pending");
       if (response.ok) {
@@ -264,22 +283,21 @@ export default function LeaveRequestPage() {
         // Użyj funkcji aktualizującej, aby mieć dostęp do aktualnej wartości previousPendingCount
         setPreviousPendingCount((prevCount) => {
           // ZAWSZE używaj localStorage jako źródła prawdy - jest aktualizowane po każdej akcji
-          const storedCount = parseInt(localStorage.getItem("notifiedPendingCount") || "0");
-          
+          const storedCount = parseInt(
+            localStorage.getItem("notifiedPendingCount") || "0"
+          );
+
           // Użyj storedCount jako actualPrevCount - localStorage jest zawsze aktualne
           const actualPrevCount = storedCount;
-          
+
           // isFirstLoad tylko przy pierwszym załadowaniu strony (nie po usunięciu wszystkich wniosków)
           const isFirstLoad = !hasInitialized && storedCount === 0;
-
-          console.log(`fetchPendingCount: prevCount=${prevCount}, storedCount=${storedCount}, actualPrevCount=${actualPrevCount}, newCount=${newCount}, isFirstLoad=${isFirstLoad}, hasInitialized=${hasInitialized}`);
 
           // Sprawdź, czy liczba wniosków wzrosła (nowe wnioski)
           // Nie pokazuj powiadomienia tylko przy pierwszym załadowaniu strony
           if (!isFirstLoad && newCount > actualPrevCount) {
             const newRequests = newCount - actualPrevCount;
-            console.log(`✅ fetchPendingCount: New pending requests detected: ${newRequests} (${actualPrevCount} -> ${newCount})`);
-            
+
             // Usuń poprzednie powiadomienia o nowych wnioskach i dodaj nowe
             setToasts((prevToasts) => {
               const filtered = prevToasts.filter(
@@ -295,40 +313,42 @@ export default function LeaveRequestPage() {
                 } do zaakceptowania`,
                 type: "info" as const,
               };
-              console.log("fetchPendingCount: Adding toast:", newToast);
               return [...filtered, newToast];
             });
-            
+
             // Zaktualizuj localStorage PO pokazaniu powiadomienia
             localStorage.setItem("notifiedPendingCount", newCount.toString());
           } else {
             if (isFirstLoad) {
-              console.log(`fetchPendingCount: First load with ${newCount} pending requests - no notification, setting localStorage`);
               // Przy pierwszym załadowaniu ustaw localStorage, aby kolejne sprawdzenia mogły wykryć zmiany
               if (newCount > 0) {
-                localStorage.setItem("notifiedPendingCount", newCount.toString());
+                localStorage.setItem(
+                  "notifiedPendingCount",
+                  newCount.toString()
+                );
               }
               setHasInitialized(true);
             } else {
               // Zawsze aktualizuj localStorage, aby było zsynchronizowane z rzeczywistością
               // (nawet jeśli liczba się zmniejszyła lub nie zmieniła)
               if (newCount !== actualPrevCount) {
-                console.log(`fetchPendingCount: Updating localStorage from ${actualPrevCount} to ${newCount}`);
-                localStorage.setItem("notifiedPendingCount", newCount.toString());
-              } else {
-                console.log(`fetchPendingCount: No change (${newCount} === ${actualPrevCount})`);
+
+                localStorage.setItem(
+                  "notifiedPendingCount",
+                  newCount.toString()
+                );
               }
             }
           }
-          
+
           // Oznacz jako zainicjalizowane po pierwszym wywołaniu
           if (!hasInitialized) {
             setHasInitialized(true);
           }
-          
+
           return newCount;
         });
-        
+
         setPendingCount(newCount);
       }
     } catch (error) {
@@ -369,7 +389,6 @@ export default function LeaveRequestPage() {
             message: "Twój wniosek urlopowy został zaakceptowany!",
             type: "success" as const,
           };
-          console.log("New toast:", newToast);
           // Zapisz w localStorage, że to powiadomienie zostało wyświetlone
           const notifiedIds = JSON.parse(
             localStorage.getItem("notifiedApprovedRequests") || "[]"
@@ -439,10 +458,7 @@ export default function LeaveRequestPage() {
   };
 
   const handleResetDate = () => {
-    setDateRange({
-      from: new Date(),
-      to: addDays(new Date(), 2),
-    });
+    setDateRange(undefined);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -598,12 +614,18 @@ export default function LeaveRequestPage() {
                     Zaznacz datę urlopu w kalendarzu
                   </CardDescription>
                 </div>
-                <Button onClick={handleResetDate}>Zresetuj datę</Button>
+                <Button onClick={handleResetDate}>Wyczysć</Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="flex justify-center items-center">
                 <Calendar
+                  disabled={(date) => {
+                    const day = date.getDay();
+                    const isWeekend = day === 0 || day === 6;
+                    const isHoliday = isPolishHoliday(date);
+                    return isWeekend || isHoliday;
+                  }}
                   locale={pl}
                   weekStartsOn={1}
                   mode="range"
@@ -612,6 +634,12 @@ export default function LeaveRequestPage() {
                   onSelect={setDateRange}
                   numberOfMonths={2}
                   className="rounded-lg border shadow-sm"
+                  modifiers={{
+                    holiday: (date) => isPolishHoliday(date),
+                  }}
+                  modifiersClassNames={{
+                    holiday: "rdp-holiday",
+                  }}
                 />
               </div>
             </CardContent>

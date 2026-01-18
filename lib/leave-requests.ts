@@ -1,4 +1,6 @@
 import prisma from "./db";
+import { isPolishHoliday } from "./polish-holidays";
+import { createCalendarEvent, deleteCalendarEvent } from "./google-calendar";
 
 export interface LeaveRequest {
   id?: number;
@@ -7,6 +9,7 @@ export interface LeaveRequest {
   end_date: string;
   description?: string;
   status?: "pending" | "approved" | "rejected";
+  google_calendar_event_id?: string;
   created_at?: string | Date;
 }
 
@@ -98,13 +101,39 @@ export async function getLeaveRequestsByStatus(
   }));
 }
 
-// Oblicz liczbę dni urlopu między datami
+// Oblicz liczbę dni urlopu między datami (bez weekendów)
 export function calculateLeaveDays(startDate: string, endDate: string): number {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const diffTime = Math.abs(end.getTime() - start.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  return diffDays + 1; // +1 bo wliczamy oba dni (początkowy i końcowy)
+  // Parsuj daty w formacie YYYY-MM-DD w lokalnej strefie czasowej
+  const parseDate = (dateStr: string): Date => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day, 0, 0, 0, 0);
+  };
+  
+  const start = parseDate(startDate);
+  const end = parseDate(endDate);
+  
+  // Funkcja sprawdzająca czy dzień to weekend (sobota=6, niedziela=0)
+  const isWeekend = (date: Date) => {
+    const day = date.getDay();
+    return day === 0 || day === 6;
+  };
+  
+  let daysCount = 0;
+  const currentDate = new Date(start);
+  
+  // Iteruj przez wszystkie dni w zakresie (włącznie z dniem końcowym)
+  while (currentDate <= end) {
+    // Zliczaj tylko dni robocze (bez weekendów i świąt)
+    if (!isWeekend(currentDate) && !isPolishHoliday(currentDate)) {
+      daysCount++;
+    }
+    // Przejdź do następnego dnia
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  
+  console.log(`[calculateLeaveDays] ${startDate} to ${endDate}: ${daysCount} dni roboczych (włączając weekendy byłoby ${Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1})`);
+  
+  return daysCount;
 }
 
 // Oblicz wykorzystane dni urlopu dla użytkownika
@@ -191,9 +220,61 @@ export async function updateLeaveRequestStatus(
   id: number,
   status: "pending" | "approved" | "rejected"
 ): Promise<LeaveRequest | undefined> {
+  // Pobierz obecny wniosek aby sprawdzić poprzedni status i eventId
+  const currentRequest = await prisma.leaveRequest.findUnique({
+    where: { id },
+  });
+
+  if (!currentRequest) {
+    return undefined;
+  }
+
+  const oldStatus = currentRequest.status;
+  const googleCalendarEventId = currentRequest.googleCalendarEventId;
+
+  // Jeśli zmieniamy status z "approved" na inny, usuń wydarzenie z Google Calendar
+  if (oldStatus === "approved" && status !== "approved" && googleCalendarEventId) {
+    try {
+      await deleteCalendarEvent(googleCalendarEventId);
+    } catch (error) {
+      console.error("Error deleting calendar event:", error);
+    }
+  }
+
+  const updateData: any = { status };
+  
+  // Jeśli zmieniamy status na "approved", utwórz wydarzenie w Google Calendar
+  if (status === "approved" && oldStatus !== "approved") {
+    // Pobierz informacje o użytkowniku
+    const user = await prisma.user.findUnique({
+      where: { email: currentRequest.employeeEmail },
+    });
+
+    try {
+      const eventId = await createCalendarEvent(
+        currentRequest.startDate,
+        currentRequest.endDate,
+        currentRequest.employeeEmail,
+        user?.name || undefined,
+        currentRequest.description || undefined
+      );
+      
+      if (eventId) {
+        updateData.googleCalendarEventId = eventId;
+      }
+    } catch (error) {
+      console.error("Error creating calendar event:", error);
+    }
+  }
+
+  // Jeśli zmieniamy status z "approved" na inny, usuń eventId z bazy
+  if (oldStatus === "approved" && status !== "approved") {
+    updateData.googleCalendarEventId = null;
+  }
+
   const updatedRequest = await prisma.leaveRequest.update({
     where: { id },
-    data: { status },
+    data: updateData,
   });
 
   return {
@@ -212,6 +293,19 @@ export async function updateLeaveRequest(
   id: number,
   request: Partial<Omit<LeaveRequest, "id" | "created_at">>
 ): Promise<LeaveRequest | undefined> {
+  // Pobierz obecny wniosek aby sprawdzić poprzedni status i eventId
+  const currentRequest = await prisma.leaveRequest.findUnique({
+    where: { id },
+  });
+
+  if (!currentRequest) {
+    return undefined;
+  }
+
+  const oldStatus = currentRequest.status;
+  const newStatus = request.status;
+  const googleCalendarEventId = currentRequest.googleCalendarEventId;
+
   const updateData: any = {};
 
   if (request.employee_email !== undefined)
@@ -226,6 +320,49 @@ export async function updateLeaveRequest(
   // Jeśli nie ma żadnych danych do aktualizacji, zwróć błąd
   if (Object.keys(updateData).length === 0) {
     throw new Error("No fields to update");
+  }
+
+  // Obsługa integracji z Google Calendar
+  if (newStatus !== undefined) {
+    // Jeśli zmieniamy status z "approved" na inny, usuń wydarzenie z Google Calendar
+    if (oldStatus === "approved" && newStatus !== "approved" && googleCalendarEventId) {
+      try {
+        await deleteCalendarEvent(googleCalendarEventId);
+        updateData.googleCalendarEventId = null;
+      } catch (error) {
+        console.error("Error deleting calendar event:", error);
+      }
+    }
+
+    // Jeśli zmieniamy status na "approved", utwórz wydarzenie w Google Calendar
+    if (newStatus === "approved" && oldStatus !== "approved") {
+      // Użyj nowych dat jeśli są aktualizowane, w przeciwnym razie starych
+      const startDate = updateData.startDate || currentRequest.startDate;
+      const endDate = updateData.endDate || currentRequest.endDate;
+      const employeeEmail = updateData.employeeEmail || currentRequest.employeeEmail;
+      const description = updateData.description || currentRequest.description;
+
+      // Pobierz informacje o użytkowniku
+      const user = await prisma.user.findUnique({
+        where: { email: employeeEmail },
+      });
+
+      try {
+        const eventId = await createCalendarEvent(
+          startDate,
+          endDate,
+          employeeEmail,
+          user?.name || undefined,
+          description || undefined
+        );
+        
+        if (eventId) {
+          updateData.googleCalendarEventId = eventId;
+        }
+      } catch (error) {
+        console.error("Error creating calendar event:", error);
+      }
+    }
   }
 
   const updatedRequest = await prisma.leaveRequest.update({
@@ -247,6 +384,21 @@ export async function updateLeaveRequest(
 // Usuń wniosek
 export async function deleteLeaveRequest(id: number): Promise<boolean> {
   try {
+    // Pobierz wniosek przed usunięciem aby sprawdzić czy ma eventId i status "approved"
+    const leaveRequest = await prisma.leaveRequest.findUnique({
+      where: { id },
+    });
+
+    if (leaveRequest && leaveRequest.status === "approved" && leaveRequest.googleCalendarEventId) {
+      // Usuń wydarzenie z Google Calendar
+      try {
+        await deleteCalendarEvent(leaveRequest.googleCalendarEventId);
+      } catch (error) {
+        console.error("Error deleting calendar event:", error);
+        // Kontynuuj usuwanie wniosku nawet jeśli usunięcie z kalendarza się nie powiodło
+      }
+    }
+
     await prisma.leaveRequest.delete({
       where: { id },
     });

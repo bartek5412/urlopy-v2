@@ -25,13 +25,14 @@ model User {
 }
 
 model LeaveRequest {
-  id            Int       @id @default(autoincrement())
-  employeeEmail String    @map("employee_email")
-  startDate     String    @map("start_date")
-  endDate       String    @map("end_date")
-  description   String?
-  status        String    @default("pending")
-  createdAt     String    @default("CURRENT_TIMESTAMP") @map("created_at")
+  id                    Int       @id @default(autoincrement())
+  employeeEmail         String    @map("employee_email")
+  startDate             String    @map("start_date")
+  endDate               String    @map("end_date")
+  description           String?
+  status                String    @default("pending")
+  googleCalendarEventId String?   @map("google_calendar_event_id")
+  createdAt             String    @default("CURRENT_TIMESTAMP") @map("created_at")
 
   @@map("leave_requests")
 }

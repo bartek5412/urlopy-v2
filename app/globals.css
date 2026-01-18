@@ -123,3 +123,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Podświetlenie polskich świąt w kalendarzu */
+.rdp-holiday {
+  background-color: #f39191 !important; /* Żółte tło dla świąt */
+  color: #92400e !important;
+  font-weight: 600;
+  border-radius: 0.5rem;
+}
+
+.rdp-holiday:hover {
+  background-color: #f39191 !important;
+}

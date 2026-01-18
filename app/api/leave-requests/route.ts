@@ -199,15 +199,15 @@ export async function POST(request: NextRequest) {
       (startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    if (daysUntilStart < 2) {
-      return NextResponse.json(
-        {
-          error:
-            "Nie można wysłać wniosku - termin urlopu musi być co najmniej 2 dni od dzisiaj",
-        },
-        { status: 400 }
-      );
-    }
+    // if (daysUntilStart < 2) {
+    //   return NextResponse.json(
+    //     {
+    //       error:
+    //         "Nie można wysłać wniosku - termin urlopu musi być co najmniej 2 dni od dzisiaj",
+    //     },
+    //     { status: 400 }
+    //   );
+    // }
 
     // Sprawdź konflikty dat przed utworzeniem wniosku
     const hasConflict = await checkDateConflict(

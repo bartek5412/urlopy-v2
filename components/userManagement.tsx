@@ -107,14 +107,41 @@ export default function UserManagement({ onExport }: UserManagementProps) {
         const approvedRequests = data.filter(
           (req: any) => req.status === "approved"
         );
+        // Import funkcji sprawdzającej święta
+        const { isPolishHoliday } = await import('@/lib/polish-holidays');
+        
         let totalDays = 0;
-        approvedRequests.forEach((req: any) => {
-          const start = new Date(req.start_date);
-          const end = new Date(req.end_date);
-          const diffTime = Math.abs(end.getTime() - start.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          totalDays += diffDays + 1; // +1 bo wliczamy oba dni
-        });
+        for (const req of approvedRequests) {
+          // Parsuj daty w formacie YYYY-MM-DD w lokalnej strefie czasowej
+          const parseDate = (dateStr: string): Date => {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            return new Date(year, month - 1, day, 0, 0, 0, 0);
+          };
+          
+          const start = parseDate(req.start_date);
+          const end = parseDate(req.end_date);
+          
+          // Funkcja sprawdzająca czy dzień to weekend (sobota=6, niedziela=0)
+          const isWeekend = (date: Date) => {
+            const day = date.getDay();
+            return day === 0 || day === 6;
+          };
+          
+          let daysCount = 0;
+          const currentDate = new Date(start);
+          
+          // Iteruj przez wszystkie dni w zakresie (włącznie z dniem końcowym)
+          while (currentDate <= end) {
+            // Zliczaj tylko dni robocze (bez weekendów i świąt)
+            if (!isWeekend(currentDate) && !isPolishHoliday(currentDate)) {
+              daysCount++;
+            }
+            // Przejdź do następnego dnia
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+          
+          totalDays += daysCount;
+        }
         return totalDays;
       }
     } catch (error) {
