@@ -10,6 +10,12 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_URL=file:./prisma/prod.db
+      # Google Calendar API - przekazane z .env
+      - GOOGLE_CALENDAR_CLIENT_EMAIL=${GOOGLE_CALENDAR_CLIENT_EMAIL:-}
+      - GOOGLE_CALENDAR_PRIVATE_KEY=${GOOGLE_CALENDAR_PRIVATE_KEY:-}
+      - GOOGLE_CALENDAR_ID=${GOOGLE_CALENDAR_ID:-primary}
+    env_file:
+      - .env
     volumes:
       # Persystentna baza danych SQLite
       - ./prisma/prod.db:/app/prisma/prod.db
