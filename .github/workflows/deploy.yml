@@ -25,7 +25,8 @@ jobs:
           source: "docker-compose.prod.yml,prisma/"
           target: "/opt/urlopy-v2"
           # strip_components pomaga, jeśli kopiujesz foldery, ale tu kopiujemy bezpośrednio
-          debug: true 
+          debug: true
+          use_insecure_cipher: true
 
       # KROK 2: Logowanie SSH i uruchomienie (Deploy)
       - name: Deploy and Restart Docker
@@ -39,6 +40,7 @@ jobs:
           timeout: 60s
           command_timeout: 900s
           debug: true
+          use_insecure_cipher: true
           script: |
             cd /opt/urlopy-v2
             
