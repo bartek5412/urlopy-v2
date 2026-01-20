@@ -1,4 +1,4 @@
-name: Deploy manually
+name: Deploy via Base64 Key
 
 on:
   push:
@@ -13,31 +13,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install SSH Key
+      - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh/
-          # Wgrywamy klucz z sekretów do pliku (tak jak masz lokalnie ./vps_key)
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          
+          # DEKODOWANIE KLUCZA Z BASE64 DO PLIKU
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
+          
+          # Ustawienie uprawnień (krytyczne!)
           chmod 600 ~/.ssh/id_rsa
           
-          # Dodajemy serwer do znanych hostów, żeby nie pytał "Are you sure?"
-          ssh-keyscan -p 48624 -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
+          # Debugowanie (sprawdzamy czy klucz wygląda poprawnie, nie pokazując go)
+          echo "Klucz wgrany. Pierwsza linia:"
+          head -n 1 ~/.ssh/id_rsa
+          
+          # Wyłączenie sprawdzania hosta (dla uproszczenia w CI)
+          echo -e "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile /dev/null" > ~/.ssh/config
 
-      - name: Copy files via SCP (Native)
+      - name: Copy files via SCP
         run: |
-          # Kopiujemy pliki używając systemowego SCP (tak jak Ty lokalnie)
-          # Flaga -P (duże P) służy do portu w scp, w ssh jest małe -p
-          scp -P 48624 -i ~/.ssh/id_rsa -r docker-compose.prod.yml prisma/ ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:/opt/urlopy-v2
+          # Używamy flagi -v (verbose) żeby widzieć co się dzieje
+          scp -v -P 48624 -i ~/.ssh/id_rsa -r docker-compose.prod.yml prisma/ ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:/opt/urlopy-v2
 
-      - name: Deploy via SSH (Native)
+      - name: Deploy via SSH
         run: |
-          ssh -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+          ssh -v -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /opt/urlopy-v2
-            
-            # Tutaj zwykłe komendy basha
             docker-compose -f docker-compose.prod.yml down || true
             docker-compose -f docker-compose.prod.yml build
             docker-compose -f docker-compose.prod.yml up -d
-            
             docker image prune -f
           EOF
