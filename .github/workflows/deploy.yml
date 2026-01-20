@@ -9,70 +9,49 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS
+      # KROK 1: Kopiowanie plików (zamiast ręcznego SSH pipe)
+      - name: Copy files to VPS via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 48624
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
+          source: "docker-compose.prod.yml,prisma/"
+          target: "/opt/urlopy-v2"
+          # strip_components pomaga, jeśli kopiujesz foldery, ale tu kopiujemy bezpośrednio
+          debug: true 
+
+      # KROK 2: Logowanie SSH i uruchomienie (Deploy)
+      - name: Deploy and Restart Docker
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE || '' }}
+          port: 48624
+          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
           timeout: 60s
           command_timeout: 900s
+          debug: true
           script: |
             cd /opt/urlopy-v2
             
-            # Zatrzymaj stary kontener
+            # Jeśli używasz Gita na serwerze (opcjonalne, skoro kopiujemy pliki wyżej)
+            # if [ -d ".git" ]; then
+            #   git pull origin master || true
+            # fi
+
+            # Przebuduj i uruchom
             docker-compose -f docker-compose.prod.yml down || true
-            
-            # Pobierz najnowszy kod z repozytorium (jeśli repo jest na VPS)
-            if [ -d ".git" ]; then
-              git pull origin master || true
-            fi
-
-      - name: Copy files to VPS using tar pipe
-        run: |
-          # Przygotuj klucz SSH
-          mkdir -p ~/.ssh
-          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          
-          # Skopiuj docker-compose.prod.yml
-          cat docker-compose.prod.yml | ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cat > /opt/urlopy-v2/docker-compose.prod.yml"
-          
-          # Skopiuj folder prisma przez tar pipe
-          tar czf - prisma/ | ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cd /opt/urlopy-v2 && tar xzf -"
-          
-          # Usuń klucz tymczasowy
-          rm -f ~/.ssh/deploy_key
-
-      - name: Build and start containers on VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE || '' }}
-          timeout: 60s
-          command_timeout: 900s
-          script: |
-            cd /opt/urlopy-v2
-            
-            # Zbuduj obraz Docker na VPS
             docker-compose -f docker-compose.prod.yml build
-            
-            # Uruchom nowy kontener
             docker-compose -f docker-compose.prod.yml up -d
             
-            # Wyczyść stare obrazy (opcjonalnie)
-            docker image prune -f || true
-            
-            # Sprawdź status
+            # Sprzątanie
+            docker image prune -f
             docker-compose -f docker-compose.prod.yml ps
-            docker-compose -f docker-compose.prod.yml logs --tail=50
