@@ -1,4 +1,4 @@
-name: Deploy to VPS
+name: Deploy manually
 
 on:
   push:
@@ -13,47 +13,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # KROK 1: Kopiowanie plików (zamiast ręcznego SSH pipe)
-      - name: Copy files to VPS via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: 48624
-          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
-          source: "docker-compose.prod.yml,prisma/"
-          target: "/opt/urlopy-v2"
-          # strip_components pomaga, jeśli kopiujesz foldery, ale tu kopiujemy bezpośrednio
-          debug: true
-          use_insecure_cipher: true
+      - name: Install SSH Key
+        run: |
+          mkdir -p ~/.ssh/
+          # Wgrywamy klucz z sekretów do pliku (tak jak masz lokalnie ./vps_key)
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          
+          # Dodajemy serwer do znanych hostów, żeby nie pytał "Are you sure?"
+          ssh-keyscan -p 48624 -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      # KROK 2: Logowanie SSH i uruchomienie (Deploy)
-      - name: Deploy and Restart Docker
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: 48624
-          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE }}
-          timeout: 60s
-          command_timeout: 900s
-          debug: true
-          use_insecure_cipher: true
-          script: |
+      - name: Copy files via SCP (Native)
+        run: |
+          # Kopiujemy pliki używając systemowego SCP (tak jak Ty lokalnie)
+          # Flaga -P (duże P) służy do portu w scp, w ssh jest małe -p
+          scp -P 48624 -i ~/.ssh/id_rsa -r docker-compose.prod.yml prisma/ ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:/opt/urlopy-v2
+
+      - name: Deploy via SSH (Native)
+        run: |
+          ssh -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /opt/urlopy-v2
             
-            # Jeśli używasz Gita na serwerze (opcjonalne, skoro kopiujemy pliki wyżej)
-            # if [ -d ".git" ]; then
-            #   git pull origin master || true
-            # fi
-
-            # Przebuduj i uruchom
+            # Tutaj zwykłe komendy basha
             docker-compose -f docker-compose.prod.yml down || true
             docker-compose -f docker-compose.prod.yml build
             docker-compose -f docker-compose.prod.yml up -d
             
-            # Sprzątanie
             docker image prune -f
-            docker-compose -f docker-compose.prod.yml ps
+          EOF
