@@ -71,7 +71,7 @@ jobs:
             echo "Building image..."
             docker-compose -f docker-compose.prod.yml build
             echo "Running Prisma migrations..."
-            docker-compose -f docker-compose.prod.yml run --rm urlopy-app npm run prisma:migrate
+            docker-compose -f docker-compose.prod.yml run --rm -T urlopy-app npm run prisma:migrate
             echo "Starting containers..."
             docker-compose -f docker-compose.prod.yml up -d --remove-orphans
             echo "Container status:"
