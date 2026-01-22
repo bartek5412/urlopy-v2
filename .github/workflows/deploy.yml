@@ -13,59 +13,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Prepare VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE || '' }}
-          timeout: 60s
-          command_timeout: 900s
-          script: |
-            mkdir -p /www/wwwroot/urlopy
-            cd /www/wwwroot/urlopy
-
-            # Zatrzymaj stary kontener (je�li istnieje)
-            docker-compose -f docker-compose.prod.yml down || true
-
-      - name: Copy project to VPS using tar pipe
+      - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh/
           
-          # Skopiuj ca�y projekt (bez build artefakt�w i lokalnej bazy dev)
-          tar czf - \
-            --exclude=.git \
-            --exclude=node_modules \
-            --exclude=.next \
-            --exclude=dev.db \
-            --exclude=prisma/prod.db \
-            . | ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cd /www/wwwroot/urlopy && tar xzf -"
+          # DEKODOWANIE KLUCZA Z BASE64 DO PLIKU
+          echo "${{ secrets.VPS_SSH_KEY }}" | base64 -d > ~/.ssh/id_rsa
           
-          # Usu� klucz tymczasowy
-          rm -f ~/.ssh/deploy_key
+          # Ustawienie uprawnień (krytyczne!)
+          chmod 600 ~/.ssh/id_rsa
+          
+          # Debugowanie (sprawdzamy czy klucz wygląda poprawnie, nie pokazując go)
+          echo "Klucz wgrany. Pierwsza linia:"
+          head -n 1 ~/.ssh/id_rsa
+          
+          # Wyłączenie sprawdzania hosta (dla uproszczenia w CI)
+          echo -e "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile /dev/null" > ~/.ssh/config
 
-      - name: Build and start containers on VPS
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
-          passphrase: ${{ secrets.VPS_SSH_PASSPHRASE || '' }}
-          timeout: 60s
-          command_timeout: 900s
-          script: |
-            cd /www/wwwroot/urlopy
-            
-            # Zbuduj obraz Docker na VPS
+      - name: Copy files via SCP
+        run: |
+          # Używamy flagi -v (verbose) żeby widzieć co się dzieje
+          scp -v -P 48624 -i ~/.ssh/id_rsa -r docker-compose.prod.yml prisma/ ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:/opt/urlopy-v2
+
+      - name: Deploy via SSH
+        run: |
+          ssh -v -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+            cd /opt/urlopy-v2
+            docker-compose -f docker-compose.prod.yml down || true
             docker-compose -f docker-compose.prod.yml build
             docker-compose -f docker-compose.prod.yml up -d
-            
-            # Wyczy�� stare obrazy (opcjonalnie)
-            docker image prune -f || true
-            
-            # Sprawd� status
-            docker-compose -f docker-compose.prod.yml ps
-            docker-compose -f docker-compose.prod.yml logs --tail=50
+            docker image prune -f
+          EOF
