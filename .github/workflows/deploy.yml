@@ -64,12 +64,17 @@ jobs:
         run: |
           ssh -v -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /www/wwwroot/urlopy
-            set -e
-            set -o pipefail
+            set -euxo pipefail
             trap 'echo "Deploy failed. Showing status and logs..." && docker-compose -f docker-compose.prod.yml ps -a || true; docker-compose -f docker-compose.prod.yml logs --no-color --tail=200 || true' ERR
+            echo "Stopping existing containers..."
             docker-compose -f docker-compose.prod.yml down || true
+            echo "Building image..."
             docker-compose -f docker-compose.prod.yml build
+            echo "Running Prisma migrations..."
             docker-compose -f docker-compose.prod.yml run --rm urlopy-app npm run prisma:migrate
-            docker-compose -f docker-compose.prod.yml up -d
+            echo "Starting containers..."
+            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            echo "Container status:"
+            docker-compose -f docker-compose.prod.yml ps -a
             docker image prune -f
           EOF
