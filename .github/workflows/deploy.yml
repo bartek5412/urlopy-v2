@@ -13,6 +13,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Build app
+        env:
+          NODE_ENV: production
+          NEXT_TELEMETRY_DISABLED: "1"
+          DATABASE_URL: "file:./prisma/dev.db"
+        run: |
+          npm ci
+          npm run build
+
       - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh/
@@ -30,17 +45,27 @@ jobs:
           # Wyłączenie sprawdzania hosta (dla uproszczenia w CI)
           echo -e "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile /dev/null" > ~/.ssh/config
 
-      - name: Copy files via SCP
+      - name: Copy repo via tar pipe
         run: |
-          # Używamy flagi -v (verbose) żeby widzieć co się dzieje
-          scp -v -P 48624 -i ~/.ssh/id_rsa -r docker-compose.prod.yml prisma/ ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }}:/opt/urlopy-v2
+          ssh -v -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
+            mkdir -p /www/wwwroot/urlopy
+          EOF
+
+          tar czf - \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=.next \
+            --exclude=dev.db \
+            --exclude=prisma/prod.db \
+            . | ssh -v -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cd /www/wwwroot/urlopy && tar xzf -"
 
       - name: Deploy via SSH
         run: |
           ssh -v -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
-            cd /opt/urlopy-v2
+            cd /www/wwwroot/urlopy
             docker-compose -f docker-compose.prod.yml down || true
             docker-compose -f docker-compose.prod.yml build
+            docker-compose -f docker-compose.prod.yml run --rm urlopy-app npm run prisma:migrate
             docker-compose -f docker-compose.prod.yml up -d
             docker image prune -f
           EOF
