@@ -64,6 +64,9 @@ jobs:
         run: |
           ssh -v -p 48624 -i ~/.ssh/id_rsa ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} << 'EOF'
             cd /www/wwwroot/urlopy
+            set -e
+            set -o pipefail
+            trap 'echo "Deploy failed. Showing status and logs..." && docker-compose -f docker-compose.prod.yml ps -a || true; docker-compose -f docker-compose.prod.yml logs --no-color --tail=200 || true' ERR
             docker-compose -f docker-compose.prod.yml down || true
             docker-compose -f docker-compose.prod.yml build
             docker-compose -f docker-compose.prod.yml run --rm urlopy-app npm run prisma:migrate
