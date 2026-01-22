@@ -14,7 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to VPS
+      - name: Prepare VPS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -25,30 +25,29 @@ jobs:
           timeout: 60s
           command_timeout: 900s
           script: |
-            cd /opt/urlopy-v2
-            
-            # Zatrzymaj stary kontener
-            docker-compose -f docker-compose.prod.yml down || true
-            
-            # Pobierz najnowszy kod z repozytorium (jeÅ›li repo jest na VPS)
-            if [ -d ".git" ]; then
-              git pull origin master || true
-            fi
+            mkdir -p /www/wwwroot/urlopy
+            cd /www/wwwroot/urlopy
 
-      - name: Copy files to VPS using tar pipe
+            # Zatrzymaj stary kontener (jeœli istnieje)
+            docker-compose -f docker-compose.prod.yml down || true
+
+      - name: Copy project to VPS using tar pipe
         run: |
           # Przygotuj klucz SSH
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           
-          # Skopiuj docker-compose.prod.yml
-          cat docker-compose.prod.yml | ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cat > /opt/urlopy-v2/docker-compose.prod.yml"
+          # Skopiuj ca³y projekt (bez build artefaktów i lokalnej bazy dev)
+          tar czf - \
+            --exclude=.git \
+            --exclude=node_modules \
+            --exclude=.next \
+            --exclude=dev.db \
+            --exclude=prisma/prod.db \
+            . | ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cd /www/wwwroot/urlopy && tar xzf -"
           
-          # Skopiuj folder prisma przez tar pipe
-          tar czf - prisma/ | ssh -i ~/.ssh/deploy_key -p ${{ secrets.VPS_PORT || 22 }} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null ${{ secrets.VPS_USERNAME }}@${{ secrets.VPS_HOST }} "cd /opt/urlopy-v2 && tar xzf -"
-          
-          # UsuÅ„ klucz tymczasowy
+          # Usuñ klucz tymczasowy
           rm -f ~/.ssh/deploy_key
 
       - name: Build and start containers on VPS
@@ -62,7 +61,7 @@ jobs:
           timeout: 60s
           command_timeout: 900s
           script: |
-            cd /opt/urlopy-v2
+            cd /www/wwwroot/urlopy
             
             # Zbuduj obraz Docker na VPS
             docker-compose -f docker-compose.prod.yml build
@@ -70,9 +69,9 @@ jobs:
             # Uruchom nowy kontener
             docker-compose -f docker-compose.prod.yml up -d
             
-            # WyczyÅ›Ä‡ stare obrazy (opcjonalnie)
+            # Wyczyœæ stare obrazy (opcjonalnie)
             docker image prune -f || true
             
-            # SprawdÅº status
+            # SprawdŸ status
             docker-compose -f docker-compose.prod.yml ps
             docker-compose -f docker-compose.prod.yml logs --tail=50
