@@ -131,7 +131,7 @@
   font-weight: 600;
   border-radius: 0.5rem;
 }
-
+/* Pusty komentarz */
 .rdp-holiday:hover {
   background-color: #f39191 !important;
 }
