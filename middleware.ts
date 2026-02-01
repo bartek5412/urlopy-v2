@@ -22,6 +22,18 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (request.nextUrl.pathname.startsWith("/list-requests")) {
+    if (!user_id) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
+    const userId = parseInt(user_id.value);
+    if (isNaN(userId)) {
+      const response = NextResponse.redirect(new URL("/", request.url));
+      response.cookies.delete("user_id");
+      return response;
+    }
+  }
+
   // Przekieruj zalogowanych użytkowników ze strony logowania
   // (sprawdzamy tylko obecność cookie, weryfikacja w bazie jest w layoutach)
   if (request.nextUrl.pathname === "/" && user_id) {
@@ -37,5 +49,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/leave-request/:path*", "/"],
+  matcher: ["/leave-request/:path*", "/list-requests/:path*", "/"],
 };

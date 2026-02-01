@@ -599,7 +599,10 @@ export default function LeaveRequestPage() {
                 Zarządzanie użytkownikami
               </Button>
             )}
-            <Button variant="outline" onClick={handleLogout} size="sm">
+            <Button variant="outline" onClick={()=> {router.push("/list-requests")}} size="sm">
+              Lista urlopów
+            </Button>
+            <Button variant="default" onClick={handleLogout} size="sm">
               Wyloguj się
             </Button>
           </div>
