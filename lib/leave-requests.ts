@@ -5,12 +5,56 @@ import { createCalendarEvent, deleteCalendarEvent } from "./google-calendar";
 export interface LeaveRequest {
   id?: number;
   employee_email: string;
+  employee_name?: string;
   start_date: string;
   end_date: string;
   description?: string;
   status?: "pending" | "approved" | "rejected";
   google_calendar_event_id?: string;
   created_at?: string | Date;
+}
+
+type LeaveRequestRecord = Awaited<
+  ReturnType<typeof prisma.leaveRequest.findMany>
+>[number];
+
+async function mapLeaveRequestsWithNames(
+  requests: LeaveRequestRecord[]
+): Promise<LeaveRequest[]> {
+  if (requests.length === 0) {
+    return [];
+  }
+
+  const uniqueEmails = Array.from(
+    new Set(requests.map((req) => req.employeeEmail))
+  );
+
+  const users = await prisma.user.findMany({
+    where: {
+      email: {
+        in: uniqueEmails,
+      },
+    },
+    select: {
+      email: true,
+      name: true,
+    },
+  });
+
+  const nameByEmail = new Map(
+    users.map((user) => [user.email, user.name || undefined])
+  );
+
+  return requests.map((req) => ({
+    id: req.id,
+    employee_email: req.employeeEmail,
+    employee_name: nameByEmail.get(req.employeeEmail),
+    start_date: req.startDate,
+    end_date: req.endDate,
+    description: req.description || undefined,
+    status: req.status as "pending" | "approved" | "rejected",
+    created_at: req.createdAt,
+  }));
 }
 
 // Pobierz wszystkie wnioski urlopowe
@@ -21,15 +65,7 @@ export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
     },
   });
 
-  return requests.map((req) => ({
-    id: req.id,
-    employee_email: req.employeeEmail,
-    start_date: req.startDate,
-    end_date: req.endDate,
-    description: req.description || undefined,
-    status: req.status as "pending" | "approved" | "rejected",
-    created_at: req.createdAt,
-  }));
+  return mapLeaveRequestsWithNames(requests);
 }
 
 // Pobierz wniosek po ID
@@ -42,15 +78,8 @@ export async function getLeaveRequestById(
 
   if (!request) return undefined;
 
-  return {
-    id: request.id,
-    employee_email: request.employeeEmail,
-    start_date: request.startDate,
-    end_date: request.endDate,
-    description: request.description || undefined,
-    status: request.status as "pending" | "approved" | "rejected",
-    created_at: request.createdAt,
-  };
+  const [mapped] = await mapLeaveRequestsWithNames([request]);
+  return mapped;
 }
 
 // Pobierz wnioski dla konkretnego pracownika
@@ -66,15 +95,7 @@ export async function getLeaveRequestsByEmail(
     },
   });
 
-  return requests.map((req) => ({
-    id: req.id,
-    employee_email: req.employeeEmail,
-    start_date: req.startDate,
-    end_date: req.endDate,
-    description: req.description || undefined,
-    status: req.status as "pending" | "approved" | "rejected",
-    created_at: req.createdAt,
-  }));
+  return mapLeaveRequestsWithNames(requests);
 }
 
 // Pobierz wnioski o określonym statusie
@@ -90,15 +111,7 @@ export async function getLeaveRequestsByStatus(
     },
   });
 
-  return requests.map((req) => ({
-    id: req.id,
-    employee_email: req.employeeEmail,
-    start_date: req.startDate,
-    end_date: req.endDate,
-    description: req.description || undefined,
-    status: req.status as "pending" | "approved" | "rejected",
-    created_at: req.createdAt,
-  }));
+  return mapLeaveRequestsWithNames(requests);
 }
 
 // Oblicz liczbę dni urlopu między datami (bez weekendów)
@@ -207,6 +220,7 @@ export async function createLeaveRequest(
   return {
     id: newRequest.id,
     employee_email: newRequest.employeeEmail,
+    employee_name: undefined,
     start_date: newRequest.startDate,
     end_date: newRequest.endDate,
     description: newRequest.description || undefined,

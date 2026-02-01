@@ -1,6 +1,5 @@
 "use client";
 import { Calendar } from "@/components/ui/calendar";
-import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -21,6 +20,7 @@ type LeaveRequest = {
   start_date: string; // lub Date, jeśli przekonwertujesz wcześniej
   end_date: string;
   employee_email: string; // Przykładowe pole
+  employee_name?: string;
   description: string; // Przykładowe pole
   status: string;
   // ... inne pola
@@ -174,23 +174,30 @@ export default function ListRequestsPage() {
                   selectedRequestDetails.map((request, index) => (
                     <div
                       key={index}
-                      className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300 my-2"
+                      className="flex flex-col gap-1 animate-in fade-in slide-in-from-bottom-2 duration-300 my-1"
                     >
-                      <div className="p-4 border rounded-lg bg-green-50 border-green-200">
-                        <Label className="text-green-800 font-bold text-lg mb-2 block">
-                          Zatwierdzony urlop
-                        </Label>
-                        <div className="grid grid-cols-2 gap-2 text-sm text-gray-700 mt-2">
-                          <span className="font-semibold">Pracownik:</span>{" "}
-                          {request.employee_email}
-                          <span className="font-semibold">Typ:</span>{" "}
-                          {request.description}
-                          <span className="font-semibold">Od / Do:</span>{" "}
-                          {request.start_date} / {request.end_date}
-                          <span className="font-semibold">Status:</span>
-                          <span className=" inline-flex items-center w-fit px-2 py-0.5 rounded text-xs font-medium bg-green-200 text-green-800">
-                            {request.status}
+                      <div className="rounded-md border border-green-200 bg-white/80 px-3 py-2 shadow-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">
+                              {request.employee_name || request.employee_email}
+                            </p>
+                            <p className="text-xs text-gray-600">
+                              <span className="font-medium text-gray-700">
+                                Typ:
+                              </span>{" "}
+                              {request.description || "Brak opisu"}
+                            </p>
+                          </div>
+                          <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700">
+                            {request.status === "pending" ? "Oczekuje na akceptację" : request.status === "approved" ? "Zaakceptowany" : "Odrzucony"}
                           </span>
+                        </div>
+                        <div className="mt-1 text-xs text-gray-600">
+                          <span className="font-medium text-gray-700">
+                            Od / Do:
+                          </span>{" "}
+                          {request.start_date} / {request.end_date}
                         </div>
                       </div>
                     </div>
