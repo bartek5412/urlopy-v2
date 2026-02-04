@@ -19,7 +19,7 @@ model User {
   leaderId      Int?      @map("leader_id") // ID lidera przypisanego do pracownika
   daysAvailable Int       @default(26) // Dostępne dni urlopu
   daysPerYear   Int       @default(26) // Ile dni dodaje się po przekroczeniu roku
-  createdAt     String    @default("CURRENT_TIMESTAMP") @map("created_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
 
   @@map("users")
 }
@@ -32,7 +32,21 @@ model LeaveRequest {
   description           String?
   status                String    @default("pending")
   googleCalendarEventId String?   @map("google_calendar_event_id")
-  createdAt             String    @default("CURRENT_TIMESTAMP") @map("created_at")
+  createdAt             DateTime    @default(now()) @map("created_at")
 
   @@map("leave_requests")
 }
+
+model Room {
+  id                    Int       @id @default(autoincrement())
+  name String @unique
+  startSchedule DateTime
+  endSchedule DateTime
+  status String @default("pending")
+  description String?
+  userId Int 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("rooms")
+}
+
