@@ -21,6 +21,10 @@ interface LeaveRequest {
   description?: string;
   status?: "pending" | "approved" | "rejected";
   created_at?: string;
+  accepted_at?: string;
+  accepted_by_id?: number;
+  edited_at?: string;
+  edited_by_id?: number;
 }
 
 export default function ArchiveLeaveRequests() {
@@ -151,6 +155,26 @@ export default function ArchiveLeaveRequests() {
                   <div className="md:col-span-2">
                     <Label className="text-sm font-semibold">Opis:</Label>
                     <div className="text-sm">{leaveRequest.description}</div>
+                  </div>
+                )}
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                {leaveRequest.accepted_at && (
+                  <div>
+                    Zaakceptowano:{" "}
+                    {new Date(leaveRequest.accepted_at).toLocaleString("pl-PL")}
+                    {leaveRequest.accepted_by_id
+                      ? ` (ID: ${leaveRequest.accepted_by_id})`
+                      : ""}
+                  </div>
+                )}
+                {leaveRequest.edited_at && (
+                  <div>
+                    Edytowano:{" "}
+                    {new Date(leaveRequest.edited_at).toLocaleString("pl-PL")}
+                    {leaveRequest.edited_by_id
+                      ? ` (ID: ${leaveRequest.edited_by_id})`
+                      : ""}
                   </div>
                 )}
               </div>

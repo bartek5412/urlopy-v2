@@ -51,12 +51,13 @@ export async function PUT(
     const body = await request.json();
     const { employee_email, start_date, end_date, description, status } = body;
 
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     // Jeśli próbujemy zmienić status (akceptacja/odrzucenie), sprawdź uprawnienia
     if (status === "approved" || status === "rejected") {
-      const currentUser = await getCurrentUser();
-      if (!currentUser) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
       if (currentUser.role !== "leader") {
         return NextResponse.json(
           { error: "Only leaders can approve or reject leave requests" },
@@ -65,12 +66,24 @@ export async function PUT(
       }
     }
 
+    const isEditingFields =
+      employee_email !== undefined ||
+      start_date !== undefined ||
+      end_date !== undefined ||
+      description !== undefined;
+
     const updatedRequest = await updateLeaveRequest(id, {
       employee_email,
       start_date,
       end_date,
       description,
       status,
+      ...(status === "approved"
+        ? { accepted_by_id: currentUser.id, accepted_at: new Date() }
+        : {}),
+      ...(isEditingFields
+        ? { edited_by_id: currentUser.id, edited_at: new Date() }
+        : {}),
     });
 
     if (!updatedRequest) {
@@ -131,7 +144,7 @@ export async function DELETE(
       );
     }
 
-    const deleted = await deleteLeaveRequest(id);
+    const deleted = await deleteLeaveRequest(id, currentUser.id);
     if (!deleted) {
       return NextResponse.json(
         { error: "Leave request not found" },

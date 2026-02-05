@@ -28,6 +28,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { ToastContainer } from "@/components/ui/toast";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogContent,
@@ -85,6 +94,15 @@ export default function LeaveRequestPage() {
   >([]);
   const [availableDays, setAvailableDays] = useState<number | null>(null);
   const [usedDays, setUsedDays] = useState<number>(0);
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [isPasswordSubmitting, setIsPasswordSubmitting] = useState(false);
 
   // Użyj useMemo aby isLeader był reaktywny
   const isLeader = useMemo(() => user?.role === "leader", [user?.role]);
@@ -457,6 +475,62 @@ export default function LeaveRequestPage() {
     router.push("/");
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordMessage(null);
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordMessage({
+        type: "error",
+        text: "Wszystkie pola są wymagane",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordMessage({
+        type: "error",
+        text: "Nowe hasła nie są takie same",
+      });
+      return;
+    }
+
+    try {
+      setIsPasswordSubmitting(true);
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword,
+          newPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        throw new Error(error?.error || "Nie udało się zmienić hasła");
+      }
+
+      setPasswordMessage({
+        type: "success",
+        text: "Hasło zostało zmienione",
+      });
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error) {
+      setPasswordMessage({
+        type: "error",
+        text:
+          error instanceof Error
+            ? error.message
+            : "Wystąpił błąd podczas zmiany hasła",
+      });
+    } finally {
+      setIsPasswordSubmitting(false);
+    }
+  };
+
   const handleResetDate = () => {
     setDateRange(undefined);
   };
@@ -601,6 +675,16 @@ export default function LeaveRequestPage() {
             )}
             <Button variant="outline" onClick={()=> {router.push("/list-requests")}} size="sm">
               Lista urlopów
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPasswordMessage(null);
+                setIsPasswordDialogOpen(true);
+              }}
+              size="sm"
+            >
+              Zmień hasło
             </Button>
             <Button variant="default" onClick={handleLogout} size="sm">
               Wyloguj się
@@ -773,6 +857,72 @@ export default function LeaveRequestPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog
+        open={isPasswordDialogOpen}
+        onOpenChange={setIsPasswordDialogOpen}
+      >
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Zmień hasło</DialogTitle>
+            <DialogDescription>
+              Podaj aktualne hasło i ustaw nowe.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="current-password">Aktualne hasło</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nowe hasło</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Powtórz nowe hasło</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+            {passwordMessage && (
+              <div
+                className={`text-sm ${
+                  passwordMessage.type === "success"
+                    ? "text-green-600"
+                    : "text-red-600"
+                }`}
+              >
+                {passwordMessage.text}
+              </div>
+            )}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsPasswordDialogOpen(false)}
+              >
+                Anuluj
+              </Button>
+              <Button type="submit" disabled={isPasswordSubmitting}>
+                {isPasswordSubmitting ? "Zapisywanie..." : "Zmień hasło"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />

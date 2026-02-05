@@ -156,3 +156,51 @@ export async function getCurrentUser(): Promise<User | null> {
     return null;
   }
 }
+
+// Zmień hasło zalogowanego użytkownika
+export async function changePassword(
+  userId: number,
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    if (!currentPassword || !newPassword) {
+      return { ok: false, error: "Aktualne i nowe hasło są wymagane" };
+    }
+
+    const passwordValidation = validatePassword(newPassword);
+    if (!passwordValidation.valid) {
+      return { ok: false, error: passwordValidation.error };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { password: true },
+    });
+
+    if (!user) {
+      return { ok: false, error: "Użytkownik nie istnieje" };
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password
+    );
+
+    if (!isPasswordValid) {
+      return { ok: false, error: "Aktualne hasło jest nieprawidłowe" };
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    return { ok: true };
+  } catch (error) {
+    console.error("Error changing password:", error);
+    return { ok: false, error: "Wystąpił błąd podczas zmiany hasła" };
+  }
+}

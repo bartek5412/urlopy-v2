@@ -12,6 +12,12 @@ export interface LeaveRequest {
   status?: "pending" | "approved" | "rejected";
   google_calendar_event_id?: string;
   created_at?: string | Date;
+  accepted_at?: string | Date;
+  accepted_by_id?: number;
+  cancelled_at?: string | Date;
+  cancelled_by_id?: number;
+  edited_at?: string | Date;
+  edited_by_id?: number;
 }
 
 type LeaveRequestRecord = Awaited<
@@ -54,12 +60,21 @@ async function mapLeaveRequestsWithNames(
     description: req.description || undefined,
     status: req.status as "pending" | "approved" | "rejected",
     created_at: req.createdAt,
+    accepted_at: req.acceptedAt ?? undefined,
+    accepted_by_id: req.acceptedById ?? undefined,
+    cancelled_at: req.cancelledAt ?? undefined,
+    cancelled_by_id: req.cancelledById ?? undefined,
+    edited_at: req.editedAt ?? undefined,
+    edited_by_id: req.editedById ?? undefined,
   }));
 }
 
 // Pobierz wszystkie wnioski urlopowe
 export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
   const requests = await prisma.leaveRequest.findMany({
+    where: {
+      isDeleted: false,
+    },
     orderBy: {
       createdAt: "desc",
     },
@@ -72,8 +87,8 @@ export async function getAllLeaveRequests(): Promise<LeaveRequest[]> {
 export async function getLeaveRequestById(
   id: number
 ): Promise<LeaveRequest | undefined> {
-  const request = await prisma.leaveRequest.findUnique({
-    where: { id },
+  const request = await prisma.leaveRequest.findFirst({
+    where: { id, isDeleted: false },
   });
 
   if (!request) return undefined;
@@ -89,6 +104,7 @@ export async function getLeaveRequestsByEmail(
   const requests = await prisma.leaveRequest.findMany({
     where: {
       employeeEmail: email,
+      isDeleted: false,
     },
     orderBy: {
       createdAt: "desc",
@@ -105,6 +121,7 @@ export async function getLeaveRequestsByStatus(
   const requests = await prisma.leaveRequest.findMany({
     where: {
       status: status,
+      isDeleted: false,
     },
     orderBy: {
       createdAt: "desc",
@@ -155,6 +172,7 @@ export async function getUsedLeaveDays(email: string): Promise<number> {
     where: {
       employeeEmail: email,
       status: "approved", // Tylko zaakceptowane urlopy
+      isDeleted: false,
     },
   });
 
@@ -179,6 +197,7 @@ export async function checkDateConflict(
       status: {
         in: ["pending", "approved"], // Sprawdzaj tylko pending i approved
       },
+      isDeleted: false,
       ...(excludeId ? { id: { not: excludeId } } : {}),
     },
   });
@@ -226,13 +245,20 @@ export async function createLeaveRequest(
     description: newRequest.description || undefined,
     status: newRequest.status as "pending" | "approved" | "rejected",
     created_at: newRequest.createdAt,
+    accepted_at: newRequest.acceptedAt ?? undefined,
+    accepted_by_id: newRequest.acceptedById ?? undefined,
+    cancelled_at: newRequest.cancelledAt ?? undefined,
+    cancelled_by_id: newRequest.cancelledById ?? undefined,
+    edited_at: newRequest.editedAt ?? undefined,
+    edited_by_id: newRequest.editedById ?? undefined,
   };
 }
 
 // Zaktualizuj status wniosku
 export async function updateLeaveRequestStatus(
   id: number,
-  status: "pending" | "approved" | "rejected"
+  status: "pending" | "approved" | "rejected",
+  acceptedById?: number
 ): Promise<LeaveRequest | undefined> {
   // Pobierz obecny wniosek aby sprawdzić poprzedni status i eventId
   const currentRequest = await prisma.leaveRequest.findUnique({
@@ -255,7 +281,12 @@ export async function updateLeaveRequestStatus(
     }
   }
 
-  const updateData: any = { status };
+  const updateData: any = {
+    status,
+    ...(status === "approved"
+      ? { acceptedAt: new Date(), acceptedById }
+      : {}),
+  };
   
   // Jeśli zmieniamy status na "approved", utwórz wydarzenie w Google Calendar
   if (status === "approved" && oldStatus !== "approved") {
@@ -299,6 +330,12 @@ export async function updateLeaveRequestStatus(
     description: updatedRequest.description || undefined,
     status: updatedRequest.status as "pending" | "approved" | "rejected",
     created_at: updatedRequest.createdAt,
+    accepted_at: updatedRequest.acceptedAt ?? undefined,
+    accepted_by_id: updatedRequest.acceptedById ?? undefined,
+    cancelled_at: updatedRequest.cancelledAt ?? undefined,
+    cancelled_by_id: updatedRequest.cancelledById ?? undefined,
+    edited_at: updatedRequest.editedAt ?? undefined,
+    edited_by_id: updatedRequest.editedById ?? undefined,
   };
 }
 
@@ -330,6 +367,16 @@ export async function updateLeaveRequest(
   if (request.description !== undefined)
     updateData.description = request.description || null;
   if (request.status !== undefined) updateData.status = request.status;
+  if (request.accepted_by_id !== undefined)
+    updateData.acceptedById = request.accepted_by_id;
+  if (request.accepted_at !== undefined) updateData.acceptedAt = request.accepted_at;
+  if (request.cancelled_by_id !== undefined)
+    updateData.cancelledById = request.cancelled_by_id;
+  if (request.cancelled_at !== undefined)
+    updateData.cancelledAt = request.cancelled_at;
+  if (request.edited_by_id !== undefined)
+    updateData.editedById = request.edited_by_id;
+  if (request.edited_at !== undefined) updateData.editedAt = request.edited_at;
 
   // Jeśli nie ma żadnych danych do aktualizacji, zwróć błąd
   if (Object.keys(updateData).length === 0) {
@@ -392,13 +439,22 @@ export async function updateLeaveRequest(
     description: updatedRequest.description || undefined,
     status: updatedRequest.status as "pending" | "approved" | "rejected",
     created_at: updatedRequest.createdAt,
+    accepted_at: updatedRequest.acceptedAt ?? undefined,
+    accepted_by_id: updatedRequest.acceptedById ?? undefined,
+    cancelled_at: updatedRequest.cancelledAt ?? undefined,
+    cancelled_by_id: updatedRequest.cancelledById ?? undefined,
+    edited_at: updatedRequest.editedAt ?? undefined,
+    edited_by_id: updatedRequest.editedById ?? undefined,
   };
 }
 
 // Usuń wniosek
-export async function deleteLeaveRequest(id: number): Promise<boolean> {
+export async function deleteLeaveRequest(
+  id: number,
+  cancelledById?: number
+): Promise<boolean> {
   try {
-    // Pobierz wniosek przed usunięciem aby sprawdzić czy ma eventId i status "approved"
+    // Pobierz wniosek przed anulowaniem aby sprawdzić czy ma eventId i status "approved"
     const leaveRequest = await prisma.leaveRequest.findUnique({
       where: { id },
     });
@@ -413,8 +469,13 @@ export async function deleteLeaveRequest(id: number): Promise<boolean> {
       }
     }
 
-    await prisma.leaveRequest.delete({
+    await prisma.leaveRequest.update({
       where: { id },
+      data: {
+        isDeleted: true,
+        cancelledAt: new Date(),
+        ...(cancelledById ? { cancelledById } : {}),
+      },
     });
     return true;
   } catch {

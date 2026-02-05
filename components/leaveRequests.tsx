@@ -42,6 +42,10 @@ interface LeaveRequest {
   description?: string;
   status?: "pending" | "approved" | "rejected";
   created_at?: string;
+  accepted_at?: string;
+  accepted_by_id?: number;
+  edited_at?: string;
+  edited_by_id?: number;
 }
 
 interface LeaveRequestsProps {
@@ -307,6 +311,26 @@ export default function LeaveRequests({
                 <Label>Data zakończenia: {leaveRequest.end_date}</Label>
 
                 <Label>Rodzaj urlopu: {leaveRequest.description}</Label>
+              </div>
+              <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                {leaveRequest.accepted_at && (
+                  <div>
+                    Zaakceptowano:{" "}
+                    {new Date(leaveRequest.accepted_at).toLocaleString("pl-PL")}
+                    {leaveRequest.accepted_by_id
+                      ? ` (ID: ${leaveRequest.accepted_by_id})`
+                      : ""}
+                  </div>
+                )}
+                {leaveRequest.edited_at && (
+                  <div>
+                    Edytowano:{" "}
+                    {new Date(leaveRequest.edited_at).toLocaleString("pl-PL")}
+                    {leaveRequest.edited_by_id
+                      ? ` (ID: ${leaveRequest.edited_by_id})`
+                      : ""}
+                  </div>
+                )}
               </div>
               <div className="flex flex-row justify-end gap-2">
                 <Button
