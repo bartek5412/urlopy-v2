@@ -73,7 +73,7 @@ jobs:
             echo "Running Prisma migrations..."
             docker-compose -f docker-compose.prod.yml run --rm -T urlopy-app npm run prisma:migrate </dev/null
             echo "Running Prisma seed (only if users table is empty)..."
-            docker-compose -f docker-compose.prod.yml run --rm -T urlopy-app sh -lc 'node -e "const { PrismaClient } = require(\"@prisma/client\"); (async () => { const prisma = new PrismaClient(); const count = await prisma.user.count(); await prisma.$disconnect(); if (count === 0) { process.exit(10); } })().catch(() => process.exit(1));" || exitCode=$?; if [ "${exitCode:-0}" = "10" ]; then echo "Seeding..."; npm run prisma:seed; else echo "Seed skipped (users exist)."; fi' </dev/null
+            docker-compose -f docker-compose.prod.yml run --rm -T urlopy-app sh -lc 'node -e "const { PrismaClient } = require(\"@prisma/client\"); (async () => { const prisma = new PrismaClient(); const count = await prisma.user.count(); await prisma[\"$disconnect\"](); if (count === 0) { process.exit(10); } })().catch(() => process.exit(1));" || exitCode=$?; if [ "${exitCode:-0}" = "10" ]; then echo "Seeding..."; npm run prisma:seed; else echo "Seed skipped (users exist)."; fi' </dev/null
             echo "Starting containers..."
             docker-compose -f docker-compose.prod.yml up -d --remove-orphans
             echo "Container status:"
