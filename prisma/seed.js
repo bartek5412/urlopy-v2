@@ -26,19 +26,19 @@ async function main() {
     const plainPassword = shouldGeneratePassword
       ? generateRandomPassword()
       : user.password;
+    const existingUser = await prisma.user.findUnique({
+      where: { email: user.email.toLowerCase().trim() },
+      select: { id: true },
+    });
+
+    if (existingUser) {
+      continue;
+    }
+
     const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
-    await prisma.user.upsert({
-      where: { email: user.email.toLowerCase().trim() },
-      update: {
-        name: user.name,
-        role: user.role || "employee",
-        daysAvailable: user.daysAvailable ?? 26,
-        daysPerYear: user.daysPerYear ?? 26,
-        password: hashedPassword,
-        mustChangePassword: shouldGeneratePassword ? true : false,
-      },
-      create: {
+    await prisma.user.create({
+      data: {
         email: user.email.toLowerCase().trim(),
         password: hashedPassword,
         name: user.name,
