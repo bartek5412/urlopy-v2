@@ -20,6 +20,7 @@ model User {
   daysAvailable Int       @default(26) // Dostępne dni urlopu
   daysPerYear   Int       @default(26) // Ile dni dodaje się po przekroczeniu roku
   createdAt     String    @default("CURRENT_TIMESTAMP") @map("created_at")
+  mustChangePassword Boolean @default(false) @map("must_change_password")
   cancelledLeaveRequests LeaveRequest[] @relation("LeaveRequestCancelledBy")
   editedLeaveRequests    LeaveRequest[] @relation("LeaveRequestEditedBy")
   acceptedLeaveRequests  LeaveRequest[] @relation("LeaveRequestAcceptedBy")

@@ -46,7 +46,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { pl } from "date-fns/locale";
 import { isPolishHoliday, getPolishHolidays } from "@/lib/polish-holidays";
 
@@ -61,6 +61,7 @@ interface User {
 
 export default function LeaveRequestPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
@@ -95,6 +96,7 @@ export default function LeaveRequestPage() {
   const [availableDays, setAvailableDays] = useState<number | null>(null);
   const [usedDays, setUsedDays] = useState<number>(0);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isPasswordForced, setIsPasswordForced] = useState(false);
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -113,6 +115,18 @@ export default function LeaveRequestPage() {
       setIsDialogOpen(true);
     }
   }, [submitMessage]);
+
+  useEffect(() => {
+    const forceChange = searchParams.get("forcePasswordChange") === "1";
+    if (forceChange) {
+      setIsPasswordForced(true);
+      setPasswordMessage({
+        type: "error",
+        text: "Musisz zmienić hasło przy pierwszym logowaniu.",
+      });
+      setIsPasswordDialogOpen(true);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     async function fetchUser() {
@@ -518,6 +532,8 @@ export default function LeaveRequestPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setIsPasswordForced(false);
+      setIsPasswordDialogOpen(false);
     } catch (error) {
       setPasswordMessage({
         type: "error",
@@ -860,7 +876,10 @@ export default function LeaveRequestPage() {
 
       <Dialog
         open={isPasswordDialogOpen}
-        onOpenChange={setIsPasswordDialogOpen}
+        onOpenChange={(open) => {
+          if (isPasswordForced) return;
+          setIsPasswordDialogOpen(open);
+        }}
       >
         <DialogContent className="sm:max-w-[420px]">
           <DialogHeader>
@@ -909,13 +928,15 @@ export default function LeaveRequestPage() {
               </div>
             )}
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsPasswordDialogOpen(false)}
-              >
-                Anuluj
-              </Button>
+              {!isPasswordForced && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsPasswordDialogOpen(false)}
+                >
+                  Anuluj
+                </Button>
+              )}
               <Button type="submit" disabled={isPasswordSubmitting}>
                 {isPasswordSubmitting ? "Zapisywanie..." : "Zmień hasło"}
               </Button>

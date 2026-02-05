@@ -44,7 +44,12 @@ export default function HomePage() {
       });
 
       if (response.ok) {
-        router.push("/leave-request");
+        const data = await response.json();
+        if (data?.user?.mustChangePassword) {
+          router.push("/leave-request?forcePasswordChange=1");
+        } else {
+          router.push("/leave-request");
+        }
       } else {
         const error = await response.json();
         setErrorMessage(error.error || "Błąd logowania");

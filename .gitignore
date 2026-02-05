@@ -49,3 +49,6 @@ dev.db-wal
 dev.db-shm
 # Production database files should be on server, not in git
 # But we don't ignore all *.db to allow prod.db structure
+
+# seed data
+prisma/seed-output.txt

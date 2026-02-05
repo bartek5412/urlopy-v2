@@ -11,6 +11,7 @@ export interface User {
   leaderId?: number | null;
   daysAvailable?: number;
   daysPerYear?: number;
+  mustChangePassword?: boolean;
 }
 
 // Utwórz nowego użytkownika
@@ -65,6 +66,7 @@ export async function createUser(
         leaderId: user.leaderId || null,
         daysAvailable: user.daysAvailable ?? 26,
         daysPerYear: user.daysPerYear ?? 26,
+        mustChangePassword: user.mustChangePassword ?? false,
       },
     };
   } catch (error: any) {
@@ -121,6 +123,7 @@ export async function loginUser(
         leaderId: user.leaderId || null,
         daysAvailable: user.daysAvailable ?? 26,
         daysPerYear: user.daysPerYear ?? 26,
+        mustChangePassword: user.mustChangePassword ?? false,
       },
     };
   } catch (error) {
@@ -151,6 +154,7 @@ export async function getCurrentUser(): Promise<User | null> {
       leaderId: user.leaderId || null,
       daysAvailable: user.daysAvailable ?? 26,
       daysPerYear: user.daysPerYear ?? 26,
+      mustChangePassword: user.mustChangePassword ?? false,
     };
   } catch {
     return null;
@@ -195,7 +199,7 @@ export async function changePassword(
 
     await prisma.user.update({
       where: { id: userId },
-      data: { password: hashedPassword },
+      data: { password: hashedPassword, mustChangePassword: false },
     });
 
     return { ok: true };
