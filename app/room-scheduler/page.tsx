@@ -133,7 +133,7 @@ export default function RoomSchedulerPage() {
                         </div>
                         <div className="flex flex-col gap-2">
                           <Label>Godzina rozpoczęcia</Label>
-                          <Input type="time" />
+                          <Input type="time" step="900" />
                         </div>
                         <div className="flex flex-col gap-2">
                           <Label>Godzina zakończenia</Label>
