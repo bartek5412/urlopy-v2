@@ -10,7 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { DateRange } from "react-day-picker";
 import { addDays } from "date-fns";
 import { Input } from "@/components/ui/input";
@@ -59,7 +59,7 @@ interface User {
   daysPerYear?: number;
 }
 
-export default function LeaveRequestPage() {
+function LeaveRequestPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
@@ -948,5 +948,19 @@ export default function LeaveRequestPage() {
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
+  );
+}
+
+export default function LeaveRequestPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex justify-center items-center h-screen">
+          <div>Ładowanie...</div>
+        </div>
+      }
+    >
+      <LeaveRequestPageContent />
+    </Suspense>
   );
 }
