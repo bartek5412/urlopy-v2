@@ -76,6 +76,16 @@ export async function createCalendarEvent(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Error creating calendar event:', response.status, errorText);
+      if (process.env.NODE_ENV === 'production') {
+        const maskedEmail = clientEmail
+          ? clientEmail.replace(/^(.{2}).+(@.*)$/, '$1***$2')
+          : null;
+        console.error('Calendar config (prod debug):', {
+          calendarId,
+          clientEmail: maskedEmail,
+          hasPrivateKey: Boolean(privateKey),
+        });
+      }
       return null;
     }
 
