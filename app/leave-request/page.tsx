@@ -599,6 +599,9 @@ export default function LeaveRequestPage() {
                 Zarządzanie użytkownikami
               </Button>
             )}
+            <Button variant="outline" onClick={() => router.push("/room-scheduler")} size="sm">
+              Rezerwacja sali konferencyjnej
+            </Button>
             <Button variant="outline" onClick={()=> {router.push("/list-requests")}} size="sm">
               Lista urlopów
             </Button>

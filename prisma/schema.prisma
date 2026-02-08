@@ -39,7 +39,7 @@ model LeaveRequest {
 
 model Room {
   id                    Int       @id @default(autoincrement())
-  name String @unique
+  name String 
   startSchedule DateTime
   endSchedule DateTime
   status String @default("pending")

@@ -35,6 +35,22 @@ export async function GET(request: NextRequest) {
 }
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { roomId, date, startSchedule, endSchedule } = body;
-  console.log(body, 'body')
+  try {
+    const room = await prisma.room.create({
+      data: {
+        name: body.name,
+        startSchedule: body.startSchedule,
+        endSchedule: body.endSchedule,
+        userId: body.userId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        description: body.description,
+      }
+    })
+    return NextResponse.json(room);
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to create room" }, { status: 500 });
+  } finally {
+    await prisma.$disconnect();
+  }
 }
