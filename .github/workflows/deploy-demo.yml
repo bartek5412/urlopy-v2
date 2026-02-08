@@ -3,7 +3,7 @@ name: Deploy Demo via Base64 Key
 on:
   push:
     branches:
-      - demos
+      - feat/demos
   workflow_dispatch:
 
 jobs:
