@@ -1,6 +1,6 @@
 #!/bin/sh
 set -e
-
+cd /app
 # Upewnij sie, ze katalog bazy istnieje
 mkdir -p /app/prisma
 
