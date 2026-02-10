@@ -40,7 +40,7 @@ interface LeaveRequest {
   start_date: string;
   end_date: string;
   description?: string;
-  status?: "pending" | "approved" | "rejected";
+  status?: "pending" | "approved" | "rejected" | "nextDay";
   created_at?: string;
   accepted_at?: string;
   accepted_by_id?: number;
@@ -54,7 +54,7 @@ interface LeaveRequestsProps {
   onStatusChange?: (
     requestId: number,
     oldStatus: string,
-    newStatus: string
+    newStatus: string,
   ) => void;
 }
 
@@ -66,8 +66,9 @@ export default function LeaveRequests({
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(
-    null
+    null,
   );
+  const [leaveRequestType, setLeaveRequestType] = useState<string[]>([]);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteRequestId, setDeleteRequestId] = useState<number | null>(null);
@@ -78,7 +79,7 @@ export default function LeaveRequests({
     role?: string;
   } | null>(null);
   const [previousStatuses, setPreviousStatuses] = useState<Map<number, string>>(
-    new Map()
+    new Map(),
   );
   const onStatusChangeRef = useRef(onStatusChange);
 
@@ -90,7 +91,6 @@ export default function LeaveRequests({
   useEffect(() => {
     let isMounted = true;
     let userEmail: string | null = null;
-
     async function fetchLeaveRequests(silent = false) {
       try {
         if (!silent) {
@@ -112,7 +112,7 @@ export default function LeaveRequests({
 
         // Pobierz wnioski dla zalogowanego użytkownika
         const response = await fetch(
-          `/api/leave-requests?email=${encodeURIComponent(userEmail || "")}`
+          `/api/leave-requests?email=${encodeURIComponent(userEmail || "")}`,
         );
         if (response.ok) {
           const contentType = response.headers.get("content-type");
@@ -142,7 +142,7 @@ export default function LeaveRequests({
                       onStatusChangeRef.current?.(
                         requestId,
                         previousStatus,
-                        newStatus
+                        newStatus,
                       );
                     }, 0);
                   }
@@ -228,7 +228,7 @@ export default function LeaveRequests({
           .catch(() => ({ error: "Unknown error" }));
         console.error("Error updating leave request:", errorData);
         alert(
-          `Błąd: ${errorData.error || "Nie udało się zaktualizować wniosku"}`
+          `Błąd: ${errorData.error || "Nie udało się zaktualizować wniosku"}`,
         );
       }
     } catch (error) {
@@ -292,15 +292,19 @@ export default function LeaveRequests({
                       leaveRequest.status === "pending"
                         ? "bg-yellow-500"
                         : leaveRequest.status === "approved"
-                        ? "bg-green-500"
-                        : "bg-red-500"
+                          ? "bg-green-500"
+                          : leaveRequest.status === "nextDay"
+                            ? "bg-blue-500"
+                            : "bg-red-500",
                     )}
                   >
                     {leaveRequest.status === "pending"
                       ? "Oczekuje na akceptację"
                       : leaveRequest.status === "approved"
-                      ? "Zaakceptowane"
-                      : "Odrzucone"}
+                        ? "Zaakceptowane"
+                        : leaveRequest.status === "nextDay"
+                          ? "Urlop zaległy"
+                          : "Odrzucone"}
                   </Badge>
                 </div>
               </CardDescription>

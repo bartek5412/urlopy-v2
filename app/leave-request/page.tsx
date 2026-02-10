@@ -49,6 +49,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useRouter, useSearchParams } from "next/navigation";
 import { pl } from "date-fns/locale";
 import { isPolishHoliday, getPolishHolidays } from "@/lib/polish-holidays";
+import LeaveRequestTypeDialog from "./components/leaveRequestTypeDialog";
 
 interface User {
   id: number;
@@ -59,6 +60,11 @@ interface User {
   daysPerYear?: number;
 }
 
+interface LeaveRequestType {
+  id: number;
+  name: string;
+}
+
 function LeaveRequestPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -66,12 +72,16 @@ function LeaveRequestPageContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [type, setType] = useState("");
+  const [leaveRequestType, setLeaveRequestType] = useState<LeaveRequestType[]>(
+    [],
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [typeDialogOpen, setTypeDialogOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [activeTab, setActiveTab] = useState<
     "my-requests" | "pending" | "archive" | "users"
@@ -138,7 +148,21 @@ function LeaveRequestPageContent() {
           if (data.user?.daysAvailable !== undefined) {
             setAvailableDays(data.user.daysAvailable);
           }
+          async function fetchLeaveRequestTypes() {
+            const response = await fetch("/api/request-type");
+            try {
+              if (response.ok) {
+                const data = await response.json();
+                setLeaveRequestType(data);
+              } else {
+                console.error("Otrzymano nieprawidłową odpowiedź z serwera");
+              }
+            } catch (error) {
+              console.error("Error fetching leave request types:", error);
+            }
+          }
 
+          fetchLeaveRequestTypes();
           // Sprawdź powiadomienia po zalogowaniu
           const userEmail = data.user?.email;
           const userRole = data.user?.role;
@@ -147,16 +171,16 @@ function LeaveRequestPageContent() {
             // Dla użytkownika: sprawdź czy ma zaakceptowane wnioski, które nie były jeszcze powiadomione
             if (userRole !== "leader") {
               const response = await fetch(
-                `/api/leave-requests?email=${encodeURIComponent(userEmail)}`
+                `/api/leave-requests?email=${encodeURIComponent(userEmail)}`,
               );
               if (response.ok) {
                 const requests = await response.json();
                 const notifiedIds = JSON.parse(
-                  localStorage.getItem("notifiedApprovedRequests") || "[]"
+                  localStorage.getItem("notifiedApprovedRequests") || "[]",
                 );
                 const approvedRequests = requests.filter(
                   (req: any) =>
-                    req.status === "approved" && !notifiedIds.includes(req.id)
+                    req.status === "approved" && !notifiedIds.includes(req.id),
                 );
 
                 if (approvedRequests.length > 0) {
@@ -168,7 +192,7 @@ function LeaveRequestPageContent() {
                   });
                   localStorage.setItem(
                     "notifiedApprovedRequests",
-                    JSON.stringify(notifiedIds)
+                    JSON.stringify(notifiedIds),
                   );
 
                   // Pokaż powiadomienie
@@ -193,23 +217,20 @@ function LeaveRequestPageContent() {
             // Przy logowaniu ZAWSZE pokazuj powiadomienie jeśli są wnioski (niezależnie od localStorage)
             if (userRole === "leader") {
               const response = await fetch(
-                "/api/leave-requests?status=pending"
+                "/api/leave-requests?status=pending",
               );
               if (response.ok) {
                 const requests = await response.json();
                 const newCount = requests.length;
 
-
                 // Przy logowaniu zawsze pokazuj powiadomienie jeśli są wnioski
                 if (newCount > 0) {
-
-
                   setToasts((prev) => {
                     const filtered = prev.filter(
                       (t) =>
                         !t.message.includes("nowych wniosków") &&
                         !t.message.includes("nowy wniosek") &&
-                        !t.message.includes("do zaakceptowania")
+                        !t.message.includes("do zaakceptowania"),
                     );
                     const newToast = {
                       id: `pending-on-login-${Date.now()}`,
@@ -224,7 +245,7 @@ function LeaveRequestPageContent() {
                   // Zaktualizuj localStorage PO pokazaniu powiadomienia
                   localStorage.setItem(
                     "notifiedPendingCount",
-                    newCount.toString()
+                    newCount.toString(),
                   );
                 } else {
                   // Jeśli nie ma wniosków, zresetuj localStorage
@@ -253,34 +274,34 @@ function LeaveRequestPageContent() {
     async function fetchUsedDays() {
       try {
         const response = await fetch(
-          `/api/leave-requests?email=${encodeURIComponent(userEmail || "")}`
+          `/api/leave-requests?email=${encodeURIComponent(userEmail || "")}`,
         );
         if (response.ok) {
           const data = await response.json();
           // Oblicz wykorzystane dni tylko z zaakceptowanych wniosków (bez weekendów i świąt)
           const approvedRequests = data.filter(
-            (req: any) => req.status === "approved"
+            (req: any) => req.status === "approved",
           );
           let totalDays = 0;
           approvedRequests.forEach((req: any) => {
             // Parsuj daty w formacie YYYY-MM-DD w lokalnej strefie czasowej
             const parseDate = (dateStr: string): Date => {
-              const [year, month, day] = dateStr.split('-').map(Number);
+              const [year, month, day] = dateStr.split("-").map(Number);
               return new Date(year, month - 1, day, 0, 0, 0, 0);
             };
-            
+
             const start = parseDate(req.start_date);
             const end = parseDate(req.end_date);
-            
+
             // Funkcja sprawdzająca czy dzień to weekend (sobota=6, niedziela=0)
             const isWeekend = (date: Date) => {
               const day = date.getDay();
               return day === 0 || day === 6;
             };
-            
+
             let daysCount = 0;
             const currentDate = new Date(start);
-            
+
             // Iteruj przez wszystkie dni w zakresie (włącznie z dniem końcowym)
             while (currentDate <= end) {
               // Zliczaj tylko dni robocze (bez weekendów i świąt)
@@ -290,7 +311,7 @@ function LeaveRequestPageContent() {
               // Przejdź do następnego dnia
               currentDate.setDate(currentDate.getDate() + 1);
             }
-            
+
             totalDays += daysCount;
           });
           setUsedDays(totalDays);
@@ -316,7 +337,7 @@ function LeaveRequestPageContent() {
         setPreviousPendingCount((prevCount) => {
           // ZAWSZE używaj localStorage jako źródła prawdy - jest aktualizowane po każdej akcji
           const storedCount = parseInt(
-            localStorage.getItem("notifiedPendingCount") || "0"
+            localStorage.getItem("notifiedPendingCount") || "0",
           );
 
           // Użyj storedCount jako actualPrevCount - localStorage jest zawsze aktualne
@@ -336,7 +357,7 @@ function LeaveRequestPageContent() {
                 (t) =>
                   !t.message.includes("nowych wniosków") &&
                   !t.message.includes("nowy wniosek") &&
-                  !t.message.includes("do zaakceptowania")
+                  !t.message.includes("do zaakceptowania"),
               );
               const newToast = {
                 id: `pending-${Date.now()}`,
@@ -356,7 +377,7 @@ function LeaveRequestPageContent() {
               if (newCount > 0) {
                 localStorage.setItem(
                   "notifiedPendingCount",
-                  newCount.toString()
+                  newCount.toString(),
                 );
               }
               setHasInitialized(true);
@@ -364,10 +385,9 @@ function LeaveRequestPageContent() {
               // Zawsze aktualizuj localStorage, aby było zsynchronizowane z rzeczywistością
               // (nawet jeśli liczba się zmniejszyła lub nie zmieniła)
               if (newCount !== actualPrevCount) {
-
                 localStorage.setItem(
                   "notifiedPendingCount",
-                  newCount.toString()
+                  newCount.toString(),
                 );
               }
             }
@@ -414,7 +434,7 @@ function LeaveRequestPageContent() {
         console.log("Adding approval toast notification");
         setToasts((prev) => {
           const filtered = prev.filter(
-            (t) => !t.message.includes("zaakceptowany")
+            (t) => !t.message.includes("zaakceptowany"),
           );
           const newToast = {
             id: `approved-${Date.now()}`,
@@ -423,12 +443,12 @@ function LeaveRequestPageContent() {
           };
           // Zapisz w localStorage, że to powiadomienie zostało wyświetlone
           const notifiedIds = JSON.parse(
-            localStorage.getItem("notifiedApprovedRequests") || "[]"
+            localStorage.getItem("notifiedApprovedRequests") || "[]",
           );
           notifiedIds.push(requestId);
           localStorage.setItem(
             "notifiedApprovedRequests",
-            JSON.stringify(notifiedIds)
+            JSON.stringify(notifiedIds),
           );
           // Odśwież listę wniosków i wykorzystane dni
           setRefreshKey((prev) => prev + 1);
@@ -436,7 +456,7 @@ function LeaveRequestPageContent() {
         });
       }
     },
-    []
+    [],
   );
 
   // Funkcja do usuwania toastów
@@ -468,7 +488,7 @@ function LeaveRequestPageContent() {
         link.setAttribute("href", urlObj);
         link.setAttribute(
           "download",
-          `urlopy_${new Date().toISOString().split("T")[0]}.csv`
+          `urlopy_${new Date().toISOString().split("T")[0]}.csv`,
         );
         link.style.visibility = "hidden";
         document.body.appendChild(link);
@@ -605,7 +625,7 @@ function LeaveRequestPageContent() {
         } else {
           const text = await response.text();
           throw new Error(
-            `Błąd serwera: ${response.status} ${response.statusText}`
+            `Błąd serwera: ${response.status} ${response.statusText}`,
           );
         }
       }
@@ -680,6 +700,22 @@ function LeaveRequestPageContent() {
             )}
           </div>
           <div className="flex gap-2">
+            {isLeader ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setTypeDialogOpen(true)}
+                  size="sm"
+                >
+                  Dodaj typ urlopu
+                </Button>
+                <LeaveRequestTypeDialog
+                  open={typeDialogOpen}
+                  setOpen={setTypeDialogOpen}
+                  userId={user?.id || 0}
+                />{" "}
+              </>
+            ) : null}
             {isLeader && (
               <Button
                 variant={activeTab === "users" ? "default" : "outline"}
@@ -689,7 +725,13 @@ function LeaveRequestPageContent() {
                 Zarządzanie użytkownikami
               </Button>
             )}
-            <Button variant="outline" onClick={()=> {router.push("/list-requests")}} size="sm">
+            <Button
+              variant="outline"
+              onClick={() => {
+                router.push("/list-requests");
+              }}
+              size="sm"
+            >
               Lista urlopów
             </Button>
             <Button
@@ -747,21 +789,17 @@ function LeaveRequestPageContent() {
               </div>
             </CardContent>
             <form onSubmit={handleSubmit}>
-              <CardFooter className="flex-col gap-2">
+              <CardFooter className="flex-col gap-2 absolute bottom-10 w-full">
                 <Select value={type} onValueChange={setType}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Wybierz typ urlopu" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Urlop wypoczynkowy">
-                      Urlop wypoczynkowy
-                    </SelectItem>
-                    <SelectItem value="Urlop szkoleniowy">
-                      Urlop szkoleniowy
-                    </SelectItem>
-                    <SelectItem value="Urlop okolicznościowy">
-                      Urlop okolicznościowy
-                    </SelectItem>
+                    {leaveRequestType.map((type, index) => (
+                      <SelectItem key={index} value={type.name}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <Button
@@ -823,10 +861,10 @@ function LeaveRequestPageContent() {
                   {activeTab === "pending"
                     ? "Zarządzaj wnioskami urlopowymi do zaakceptowania"
                     : activeTab === "archive"
-                    ? "Zobacz zarchiwizowane wnioski urlopowe"
-                    : activeTab === "users"
-                    ? "Zarządzaj użytkownikami, dodawaj dni urlopu"
-                    : "Zobacz swoje wnioski urlopowe"}
+                      ? "Zobacz zarchiwizowane wnioski urlopowe"
+                      : activeTab === "users"
+                        ? "Zarządzaj użytkownikami, dodawaj dni urlopu"
+                        : "Zobacz swoje wnioski urlopowe"}
                 </CardDescription>
               </div>
             </CardHeader>

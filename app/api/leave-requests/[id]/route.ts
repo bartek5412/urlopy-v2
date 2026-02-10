@@ -18,11 +18,25 @@ export async function GET(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const leaveRequest = await getLeaveRequestById(id);
     if (!leaveRequest) {
       return NextResponse.json(
         { error: "Leave request not found" },
         { status: 404 }
+      );
+    }
+
+    const isLeader = currentUser.role === "leader";
+    const isOwner = leaveRequest.employee_email === currentUser.email;
+    if (!isLeader && !isOwner) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
       );
     }
 
@@ -48,6 +62,14 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
+    const existingRequest = await getLeaveRequestById(id);
+    if (!existingRequest) {
+      return NextResponse.json(
+        { error: "Leave request not found" },
+        { status: 404 }
+      );
+    }
+
     const body = await request.json();
     const { employee_email, start_date, end_date, description, status } = body;
 
@@ -56,9 +78,12 @@ export async function PUT(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const isLeader = currentUser.role === "leader";
+    const isOwner = existingRequest.employee_email === currentUser.email;
+
     // Jeśli próbujemy zmienić status (akceptacja/odrzucenie), sprawdź uprawnienia
-    if (status === "approved" || status === "rejected") {
-      if (currentUser.role !== "leader") {
+    if (status === "approved" || status === "rejected" || status === "nextDay") {
+      if (!isLeader) {
         return NextResponse.json(
           { error: "Only leaders can approve or reject leave requests" },
           { status: 403 }
@@ -72,13 +97,27 @@ export async function PUT(
       end_date !== undefined ||
       description !== undefined;
 
+    if (isEditingFields && !isLeader && !isOwner) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
+    if (employee_email !== undefined && !isLeader) {
+      return NextResponse.json(
+        { error: "Only leaders can change request owner" },
+        { status: 403 }
+      );
+    }
+
     const updatedRequest = await updateLeaveRequest(id, {
       employee_email,
       start_date,
       end_date,
       description,
       status,
-      ...(status === "approved"
+      ...(status === "approved" || status === "nextDay"
         ? { accepted_by_id: currentUser.id, accepted_at: new Date() }
         : {}),
       ...(isEditingFields

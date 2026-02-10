@@ -19,7 +19,7 @@ interface LeaveRequest {
   start_date: string;
   end_date: string;
   description?: string;
-  status?: "pending" | "approved" | "rejected";
+  status?: "pending" | "approved" | "rejected" | "nextDay";
   created_at?: string;
   accepted_at?: string;
   accepted_by_id?: number;
@@ -118,6 +118,8 @@ export default function ArchiveLeaveRequests() {
                       ? "bg-yellow-500"
                       : leaveRequest.status === "approved"
                       ? "bg-green-500"
+                      : leaveRequest.status === "nextDay"
+                      ? "bg-blue-500"
                       : "bg-red-500"
                   )}
                 >
@@ -125,6 +127,8 @@ export default function ArchiveLeaveRequests() {
                     ? "Oczekuje na akceptację"
                     : leaveRequest.status === "approved"
                     ? "Zaakceptowane"
+                    : leaveRequest.status === "nextDay"
+                    ? "Urlop zaległy"
                     : "Odrzucone"}
                 </Badge>
               </div>

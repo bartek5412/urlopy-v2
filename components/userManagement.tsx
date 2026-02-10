@@ -56,7 +56,7 @@ interface LeaveRequest {
   start_date: string;
   end_date: string;
   description?: string;
-  status?: "pending" | "approved" | "rejected";
+  status?: "pending" | "approved" | "rejected" | "nextDay";
   created_at?: string;
 }
 
@@ -77,11 +77,11 @@ export default function UserManagement({ onExport }: UserManagementProps) {
   const [requestsLoading, setRequestsLoading] = useState(false);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(
-    null
+    null,
   );
-  const [actionType, setActionType] = useState<"approve" | "reject" | null>(
-    null
-  );
+  const [actionType, setActionType] = useState<
+    "approve" | "reject" | "nextDay" | null
+  >(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteRequestId, setDeleteRequestId] = useState<number | null>(null);
 
@@ -99,37 +99,37 @@ export default function UserManagement({ onExport }: UserManagementProps) {
   async function calculateUsedDays(email: string): Promise<number> {
     try {
       const response = await fetch(
-        `/api/leave-requests?email=${encodeURIComponent(email)}`
+        `/api/leave-requests?email=${encodeURIComponent(email)}`,
       );
       if (response.ok) {
         const data = await response.json();
         // Oblicz wykorzystane dni tylko z zaakceptowanych wniosków
         const approvedRequests = data.filter(
-          (req: any) => req.status === "approved"
+          (req: any) => req.status === "approved",
         );
         // Import funkcji sprawdzającej święta
-        const { isPolishHoliday } = await import('@/lib/polish-holidays');
-        
+        const { isPolishHoliday } = await import("@/lib/polish-holidays");
+
         let totalDays = 0;
         for (const req of approvedRequests) {
           // Parsuj daty w formacie YYYY-MM-DD w lokalnej strefie czasowej
           const parseDate = (dateStr: string): Date => {
-            const [year, month, day] = dateStr.split('-').map(Number);
+            const [year, month, day] = dateStr.split("-").map(Number);
             return new Date(year, month - 1, day, 0, 0, 0, 0);
           };
-          
+
           const start = parseDate(req.start_date);
           const end = parseDate(req.end_date);
-          
+
           // Funkcja sprawdzająca czy dzień to weekend (sobota=6, niedziela=0)
           const isWeekend = (date: Date) => {
             const day = date.getDay();
             return day === 0 || day === 6;
           };
-          
+
           let daysCount = 0;
           const currentDate = new Date(start);
-          
+
           // Iteruj przez wszystkie dni w zakresie (włącznie z dniem końcowym)
           while (currentDate <= end) {
             // Zliczaj tylko dni robocze (bez weekendów i świąt)
@@ -139,7 +139,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
             // Przejdź do następnego dnia
             currentDate.setDate(currentDate.getDate() + 1);
           }
-          
+
           totalDays += daysCount;
         }
         return totalDays;
@@ -163,7 +163,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
           usersData.map(async (user: User) => {
             const usedDays = await calculateUsedDays(user.email);
             return { ...user, usedDays };
-          })
+          }),
         );
 
         setUsers(usersWithUsedDays);
@@ -208,7 +208,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
         alert(
           `Błąd: ${
             errorData.error || "Nie udało się zaktualizować użytkownika"
-          }`
+          }`,
         );
       }
     } catch (error) {
@@ -260,7 +260,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
     setSelectedUsers((prev) =>
       prev.includes(userId)
         ? prev.filter((id) => id !== userId)
-        : [...prev, userId]
+        : [...prev, userId],
     );
   };
 
@@ -290,7 +290,10 @@ export default function UserManagement({ onExport }: UserManagementProps) {
     }
   }
 
-  const handleAction = (request: LeaveRequest, type: "approve" | "reject") => {
+  const handleAction = (
+    request: LeaveRequest,
+    type: "approve" | "reject" | "nextDay",
+  ) => {
     setSelectedRequest(request);
     setActionType(type);
     setActionDialogOpen(true);
@@ -331,7 +334,22 @@ export default function UserManagement({ onExport }: UserManagementProps) {
     if (!selectedRequest?.id || !actionType) return;
 
     try {
-      const newStatus = actionType === "approve" ? "approved" : "rejected";
+      let newStatus: "pending" | "approved" | "rejected" | "nextDay" = "pending";
+      switch (actionType) {
+        case "approve":
+          newStatus = "approved";
+          break;
+        case "reject":
+          newStatus = "rejected";
+          break;
+        case "nextDay":
+          newStatus = "nextDay";
+          break;
+        default:
+          newStatus = "pending";
+          break;
+      }
+
       const response = await fetch(
         `/api/leave-requests/${selectedRequest.id}`,
         {
@@ -340,7 +358,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
           body: JSON.stringify({
             status: newStatus,
           }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -357,7 +375,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
         alert(
           `Błąd: ${
             errorData.error || "Nie udało się zaktualizować statusu wniosku"
-          }`
+          }`,
         );
       }
     } catch (error) {
@@ -465,7 +483,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
                           Dostępne dni urlopu:{" "}
                           {Math.max(
                             0,
-                            (user.daysAvailable ?? 26) - (user.usedDays ?? 0)
+                            (user.daysAvailable ?? 26) - (user.usedDays ?? 0),
                           )}{" "}
                           / {user.daysAvailable ?? 26} (wykorzystane:{" "}
                           {user.usedDays ?? 0}) | Dni/rok:{" "}
@@ -510,7 +528,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
                           Data utworzenia:{" "}
                           {leaveRequest.created_at
                             ? new Date(
-                                leaveRequest.created_at
+                                leaveRequest.created_at,
                               ).toLocaleDateString("pl-PL")
                             : "Nieznana"}
                         </CardDescription>
@@ -520,15 +538,19 @@ export default function UserManagement({ onExport }: UserManagementProps) {
                           leaveRequest.status === "approved"
                             ? "bg-green-500"
                             : leaveRequest.status === "rejected"
-                            ? "bg-red-500"
-                            : "bg-yellow-500"
+                              ? "bg-red-500"
+                              : leaveRequest.status === "nextDay"
+                                ? "bg-blue-500"
+                                : "bg-yellow-500"
                         }
                       >
                         {leaveRequest.status === "pending"
                           ? "Oczekuje"
                           : leaveRequest.status === "approved"
-                          ? "Zaakceptowane"
-                          : "Odrzucone"}
+                            ? "Zaakceptowane"
+                            : leaveRequest.status === "nextDay"
+                              ? "Urlop zaległy"
+                              : "Odrzucone"}
                       </Badge>
                     </div>
                   </CardHeader>
@@ -540,7 +562,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
                         </Label>
                         <div className="text-sm">
                           {new Date(leaveRequest.start_date).toLocaleDateString(
-                            "pl-PL"
+                            "pl-PL",
                           )}
                         </div>
                       </div>
@@ -550,7 +572,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
                         </Label>
                         <div className="text-sm">
                           {new Date(leaveRequest.end_date).toLocaleDateString(
-                            "pl-PL"
+                            "pl-PL",
                           )}
                         </div>
                       </div>
@@ -593,6 +615,7 @@ export default function UserManagement({ onExport }: UserManagementProps) {
                           Odrzuć
                         </Button>
                       )}
+
                     </div>
                   </CardContent>
                 </Card>

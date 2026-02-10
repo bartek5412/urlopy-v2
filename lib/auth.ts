@@ -1,6 +1,7 @@
 import prisma from "./db";
 import { cookies } from "next/headers";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 import { validateEmail, validatePassword, sanitizeString } from "./validation";
 
 export interface User {
@@ -12,6 +13,53 @@ export interface User {
   daysAvailable?: number;
   daysPerYear?: number;
   mustChangePassword?: boolean;
+}
+
+type AuthTokenPayload = {
+  sub: string | number;
+  role?: string;
+  email?: string;
+};
+
+export const AUTH_COOKIE_NAME = "auth_token";
+const AUTH_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 dni
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET is not set");
+  }
+  return secret;
+}
+
+export function createAuthToken(user: User): string {
+  const secret = getJwtSecret();
+  return jwt.sign(
+    { sub: user.id, role: user.role, email: user.email },
+    secret,
+    { expiresIn: AUTH_TOKEN_TTL_SECONDS }
+  );
+}
+
+export function getAuthCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax" as const,
+    maxAge: AUTH_TOKEN_TTL_SECONDS,
+    path: "/",
+  };
+}
+
+function verifyAuthToken(token: string): AuthTokenPayload | null {
+  try {
+    const secret = getJwtSecret();
+    const decoded = jwt.verify(token, secret);
+    if (typeof decoded === "string") return null;
+    return decoded as AuthTokenPayload;
+  } catch {
+    return null;
+  }
 }
 
 // Utwórz nowego użytkownika
@@ -136,12 +184,18 @@ export async function loginUser(
 export async function getCurrentUser(): Promise<User | null> {
   try {
     const cookieStore = await cookies();
-    const userId = cookieStore.get("user_id")?.value;
+    const token = cookieStore.get(AUTH_COOKIE_NAME)?.value;
 
-    if (!userId) return null;
+    if (!token) return null;
+
+    const payload = verifyAuthToken(token);
+    if (!payload?.sub) return null;
+
+    const userId = Number(payload.sub);
+    if (Number.isNaN(userId)) return null;
 
     const user = await prisma.user.findUnique({
-      where: { id: parseInt(userId) },
+      where: { id: userId },
     });
 
     if (!user) return null;

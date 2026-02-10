@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { loginUser } from "@/lib/auth";
+import {
+  loginUser,
+  createAuthToken,
+  AUTH_COOKIE_NAME,
+  getAuthCookieOptions,
+} from "@/lib/auth";
 import { cookies } from "next/headers";
 import { rateLimit, getRateLimitIdentifier } from "@/lib/rateLimit";
 
@@ -48,14 +53,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Ustaw cookie z ID użytkownika
+    const token = createAuthToken(result.user);
+
+    // Ustaw cookie z tokenem JWT
     const cookieStore = await cookies();
-    cookieStore.set("user_id", result.user.id.toString(), {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 7, // 7 dni
-    });
+    cookieStore.set(AUTH_COOKIE_NAME, token, getAuthCookieOptions());
 
     return NextResponse.json({ user: result.user });
   } catch (error) {

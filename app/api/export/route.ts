@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       req.employee_email,
       req.start_date,
       req.end_date,
-      req.status === "pending" ? "Oczekuje" : req.status === "approved" ? "Zaakceptowane" : "Odrzucone",
+      req.status === "pending" ? "Oczekuje" : req.status === "approved" ? "Zaakceptowane" : req.status === "nextDay" ? "Urlop zaległy" : "Odrzucone",
       req.description || "",
       req.created_at || ""
     ]);

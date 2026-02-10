@@ -58,8 +58,14 @@ export function rateLimit(
 
 // Funkcja pomocnicza do uzyskania identyfikatora z requestu
 export function getRateLimitIdentifier(request: Request): string {
-  // Użyj IP adresu jako identyfikatora
+  // Preferuj adres IP z runtime (mniej podatny na spoofing)
+  const runtimeIp = (request as Request & { ip?: string }).ip;
+  if (runtimeIp) return runtimeIp;
+
+  // Fallback na nagłówki proxy
   const forwarded = request.headers.get("x-forwarded-for");
-  const ip = forwarded ? forwarded.split(",")[0] : request.headers.get("x-real-ip") || "unknown";
+  const ip = forwarded
+    ? forwarded.split(",")[0]
+    : request.headers.get("x-real-ip") || "unknown";
   return ip;
 }

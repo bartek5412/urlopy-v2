@@ -24,6 +24,7 @@ model User {
   cancelledLeaveRequests LeaveRequest[] @relation("LeaveRequestCancelledBy")
   editedLeaveRequests    LeaveRequest[] @relation("LeaveRequestEditedBy")
   acceptedLeaveRequests  LeaveRequest[] @relation("LeaveRequestAcceptedBy")
+  createdLeaveRequestTypes LeaveRequestType[] @relation("LeaveRequestTypeCreatedBy")
 
   @@map("users")
 }
@@ -49,4 +50,14 @@ model LeaveRequest {
   createdAt             DateTime  @default(now()) @map("created_at")
 
   @@map("leave_requests")
+}
+model LeaveRequestType {
+  id                    Int       @id @default(autoincrement())
+  name                  String    @map("name")
+  description           String?   @map("description")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  createdBy             Int       @map("created_by")
+  createdByUser         User?     @relation("LeaveRequestTypeCreatedBy", fields: [createdBy], references: [id])
+
+  @@map("leave_request_types")
 }

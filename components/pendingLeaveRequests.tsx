@@ -45,11 +45,11 @@ export default function PendingLeaveRequests({
   const [loading, setLoading] = useState(true);
   const [actionDialogOpen, setActionDialogOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(
-    null
+    null,
   );
-  const [actionType, setActionType] = useState<"approve" | "reject" | null>(
-    null
-  );
+  const [actionType, setActionType] = useState<
+    "approve" | "reject" | "nextDay" | null
+  >(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteRequestId, setDeleteRequestId] = useState<number | null>(null);
 
@@ -74,7 +74,11 @@ export default function PendingLeaveRequests({
     }
   }
 
-  const handleAction = (request: LeaveRequest, type: "approve" | "reject") => {
+  const handleAction = (
+    request: LeaveRequest,
+    type: "approve" | "reject" | "nextDay",
+  ) => {
+    console.log("handleAction", request, type);
     setSelectedRequest(request);
     setActionType(type);
     setActionDialogOpen(true);
@@ -117,9 +121,24 @@ export default function PendingLeaveRequests({
 
   const confirmAction = async () => {
     if (!selectedRequest?.id || !actionType) return;
-
+    console.log("dupa", actionType)
     try {
-      const newStatus = actionType === "approve" ? "approved" : "rejected";
+      let newStatus = "pending";
+      switch (actionType) {
+        case "approve":
+          newStatus = "approved";
+          break;
+        case "reject":
+          newStatus = "rejected";
+          break;
+        case "nextDay":
+          newStatus = "nextDay";
+          break;
+        default:
+          newStatus = "pending";
+          break;
+      }
+      console.log("newStatus", newStatus);
       const response = await fetch(
         `/api/leave-requests/${selectedRequest.id}`,
         {
@@ -128,7 +147,7 @@ export default function PendingLeaveRequests({
           body: JSON.stringify({
             status: newStatus,
           }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -149,7 +168,7 @@ export default function PendingLeaveRequests({
         alert(
           `Błąd: ${
             errorData.error || "Nie udało się zaktualizować statusu wniosku"
-          }`
+          }`,
         );
       }
     } catch (error) {
@@ -191,7 +210,7 @@ export default function PendingLeaveRequests({
                     Data utworzenia:{" "}
                     {leaveRequest.created_at
                       ? new Date(leaveRequest.created_at).toLocaleDateString(
-                          "pl-PL"
+                          "pl-PL",
                         )
                       : "Nieznana"}
                   </CardDescription>
@@ -207,7 +226,7 @@ export default function PendingLeaveRequests({
                   </Label>
                   <div className="text-sm">
                     {new Date(leaveRequest.start_date).toLocaleDateString(
-                      "pl-PL"
+                      "pl-PL",
                     )}
                   </div>
                 </div>
@@ -217,7 +236,7 @@ export default function PendingLeaveRequests({
                   </Label>
                   <div className="text-sm">
                     {new Date(leaveRequest.end_date).toLocaleDateString(
-                      "pl-PL"
+                      "pl-PL",
                     )}
                   </div>
                 </div>
@@ -251,6 +270,12 @@ export default function PendingLeaveRequests({
                 >
                   Zaakceptuj
                 </Button>
+                <Button
+                  onClick={() => handleAction(leaveRequest, "nextDay")}
+                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                >
+                  Urlop zaległy
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -264,12 +289,16 @@ export default function PendingLeaveRequests({
             <AlertDialogTitle>
               {actionType === "approve"
                 ? "Potwierdź akceptację wniosku"
-                : "Potwierdź odrzucenie wniosku"}
+                : actionType === "reject"
+                  ? "Potwierdź odrzucenie wniosku"
+                  : "Potwierdź urlop zaległy"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {actionType === "approve"
                 ? `Czy na pewno chcesz zaakceptować wniosek urlopowy od ${selectedRequest?.employee_email}?`
-                : `Czy na pewno chcesz odrzucić wniosek urlopowy od ${selectedRequest?.employee_email}?`}
+                : actionType === "reject"
+                  ? `Czy na pewno chcesz odrzucić wniosek urlopowy od ${selectedRequest?.employee_email}?`
+                  : `Czy na pewno chcesz zaliczyć urlop zaległy od ${selectedRequest?.employee_email}?`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -279,10 +308,12 @@ export default function PendingLeaveRequests({
               className={
                 actionType === "approve"
                   ? "bg-green-600 hover:bg-green-700 text-white"
-                  : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : actionType === "reject"
+                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    : "bg-yellow-600 hover:bg-yellow-700 text-white"
               }
             >
-              {actionType === "approve" ? "Zaakceptuj" : "Odrzuć"}
+              {actionType === "approve" ? "Zaakceptuj" : actionType === "reject" ? "Odrzuć" : "Zaliczyć"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

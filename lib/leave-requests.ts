@@ -9,7 +9,7 @@ export interface LeaveRequest {
   start_date: string;
   end_date: string;
   description?: string;
-  status?: "pending" | "approved" | "rejected";
+  status?: "pending" | "approved" | "rejected" | "nextDay";
   google_calendar_event_id?: string;
   created_at?: string | Date;
   accepted_at?: string | Date;
@@ -132,7 +132,7 @@ export async function getLeaveRequestsByStatus(
 }
 
 // Oblicz liczbę dni urlopu między datami (bez weekendów)
-export function calculateLeaveDays(startDate: string, endDate: string): number {
+export function calculateLeaveDays(startDate: string, endDate: string, status?: string): number {
   // Parsuj daty w formacie YYYY-MM-DD w lokalnej strefie czasowej
   const parseDate = (dateStr: string): Date => {
     const [year, month, day] = dateStr.split('-').map(Number);
@@ -152,6 +152,7 @@ export function calculateLeaveDays(startDate: string, endDate: string): number {
   const currentDate = new Date(start);
   
   // Iteruj przez wszystkie dni w zakresie (włącznie z dniem końcowym)
+  if (status !== "nextDay") {
   while (currentDate <= end) {
     // Zliczaj tylko dni robocze (bez weekendów i świąt)
     if (!isWeekend(currentDate) && !isPolishHoliday(currentDate)) {
@@ -160,7 +161,7 @@ export function calculateLeaveDays(startDate: string, endDate: string): number {
     // Przejdź do następnego dnia
     currentDate.setDate(currentDate.getDate() + 1);
   }
-  
+}
   console.log(`[calculateLeaveDays] ${startDate} to ${endDate}: ${daysCount} dni roboczych (włączając weekendy byłoby ${Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1})`);
   
   return daysCount;
@@ -178,7 +179,7 @@ export async function getUsedLeaveDays(email: string): Promise<number> {
 
   let totalDays = 0;
   for (const request of requests) {
-    totalDays += calculateLeaveDays(request.startDate, request.endDate);
+    totalDays += calculateLeaveDays(request.startDate, request.endDate, request.status);
   }
 
   return totalDays;
@@ -437,7 +438,7 @@ export async function updateLeaveRequest(
     start_date: updatedRequest.startDate,
     end_date: updatedRequest.endDate,
     description: updatedRequest.description || undefined,
-    status: updatedRequest.status as "pending" | "approved" | "rejected",
+    status: updatedRequest.status as "pending" | "approved" | "rejected" | "nextDay",
     created_at: updatedRequest.createdAt,
     accepted_at: updatedRequest.acceptedAt ?? undefined,
     accepted_by_id: updatedRequest.acceptedById ?? undefined,
